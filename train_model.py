@@ -70,7 +70,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 print(f"✅ Step 4: Data split into training and testing sets. Training samples: {len(X_train)}")
 
 # --- Step 5: Train the Model ---
-model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42, n_jobs=--1)
+model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42, n_jobs=-1)
 print("\n⏳ Step 5: Training the XGBoost model...")
 model.fit(X_train, y_train)
 print("✅ Model training complete!")
