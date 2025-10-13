@@ -1,5 +1,5 @@
 import sqlite3
-conn = sqlite3.connect('routes.db')
+conn = sqlite3.connect('/home/tejas/Projects/Delivery_route_optimize/delivery-route-app/backend/routes.db')
 cursor = conn.cursor()
 create_table_sql = """
 CREATE TABLE IF NOT EXISTS completed_routes (

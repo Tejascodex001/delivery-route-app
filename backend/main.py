@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 # --- Initialize Models ---
 try:
-    eta_model = joblib.load('eta_prediction_model.pkl')
-    model_columns = joblib.load('model_columns.pkl')
+    eta_model = joblib.load('/home/tejas/Projects/Delivery_route_optimize/delivery-route-app/backend/eta_prediction_model.pkl')
+    model_columns = joblib.load('/home/tejas/Projects/Delivery_route_optimize/delivery-route-app/backend/model_columns.pkl')
     logger.info("ML models loaded successfully")
 except Exception as e:
     logger.warning(f"Could not load ML models: {e}")
