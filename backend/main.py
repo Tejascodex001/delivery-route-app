@@ -71,27 +71,62 @@ class PlannedRouteResponse(BaseModel):
 # --- Geocoding and ORS Utilities ---
 # You can paste your OpenRouteService API key here. If left empty, the code
 # will fall back to reading the key from the ORS_API_KEY environment variable.
-ORS_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0="
+ORS_API_KEY: str = ""
+
+# OpenRouteService provides both routing AND geocoding services
+# FREE: 1,000 geocoding requests/day, no credit card required
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 ORS_DIRECTIONS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
 ORS_MATRIX_URL = "https://api.openrouteservice.org/v2/matrix/driving-car"
 
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
+    """Geocode address using OpenRouteService first (free), then Nominatim as fallback."""
+    
+    # Try OpenRouteService Geocoding API first (FREE: 1,000 requests/day)
+    if ORS_API_KEY:
+        try:
+            url = "https://api.openrouteservice.org/geocode/search"
+            headers = {"Authorization": ORS_API_KEY}
+            params = {
+                "text": address,
+                "boundary.country": "IN",  # Focus on India
+                "size": 1
+            }
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("features"):
+                    feature = data["features"][0]
+                    coordinates = feature["geometry"]["coordinates"]
+                    lon, lat = coordinates[0], coordinates[1]
+                    logger.info(f"✅ ORS geocoded '{address}' -> [{lat}, {lon}]")
+                    return (lat, lon)
+                else:
+                    logger.warning(f"❌ ORS geocoding failed for '{address}': No features found")
+            else:
+                logger.warning(f"❌ ORS API error for '{address}': HTTP {resp.status_code}")
+        except Exception as e:
+            logger.error(f"❌ ORS geocoding error for '{address}': {e}")
+    
+    # Fallback to Nominatim
+    logger.info(f"🔄 Trying Nominatim fallback for '{address}'")
     headers = {"User-Agent": "delivery-route-app/1.0 (contact: dev@example.com)"}
     params = {"q": address, "format": "json", "limit": 1}
     try:
         resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=15)
         if resp.status_code != 200:
-            logger.warning(f"Nominatim non-200 for '{address}': {resp.status_code}")
+            logger.warning(f"❌ Nominatim non-200 for '{address}': {resp.status_code}")
             return None
         data = resp.json()
         if not data:
+            logger.warning(f"❌ No geocoding results for '{address}' from any service")
             return None
         lat = float(data[0]["lat"])  # type: ignore
         lon = float(data[0]["lon"])  # type: ignore
+        logger.info(f"✅ Nominatim geocoded '{address}' -> [{lat}, {lon}]")
         return (lat, lon)
     except Exception as e:
-        logger.error(f"Nominatim error for '{address}': {e}")
+        logger.error(f"❌ Nominatim error for '{address}': {e}")
         return None
 
 def ors_matrix(api_key: str, coords_latlon: List[Tuple[float, float]]) -> Optional[Dict[str, Any]]:
