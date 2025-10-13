@@ -12,7 +12,7 @@ print("--- Starting model training process ---")
 
 # --- Step 1: Load and Validate Data ---
 try:
-    df = pd.read_csv('delhivery_data.csv')
+    df = pd.read_csv('/home/tejas/Projects/Delivery_route_optimize/delivery-route-app/backend/dataset/delhivery_data.csv')
     print(f"✅ Step 1a: Successfully loaded 'delhivery_data.csv'. Shape: {df.shape}")
 except FileNotFoundError:
     print("❌ FATAL ERROR: 'delhivery_data.csv' not found. Please make sure it is in the same directory.")
