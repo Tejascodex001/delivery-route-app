@@ -3,8 +3,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'api_client.dart';
+import 'auth/sign_in.dart';
+import 'auth/sign_up.dart';
 
 class MapScreen extends StatefulWidget {
   final void Function()? onOpenSavedRoutes;
@@ -25,6 +28,7 @@ class _MapScreenState extends State<MapScreen> {
   List<LatLng> _polyline = [];
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
+  LatLng? _current;
 
   // Local saved routes (simple in-memory). Each item is a list of addresses.
   final List<List<String>> _savedRoutes = [];
@@ -295,6 +299,11 @@ class _MapScreenState extends State<MapScreen> {
                           },
                         ),
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.my_location),
+                        tooltip: 'My Location',
+                        onPressed: _goToMyLocation,
+                      ),
                     ],
                   ),
                 ),
@@ -399,7 +408,11 @@ class _MyAppState extends State<MyApp> {
       themeMode: _mode,
       theme: ThemeData(colorSchemeSeed: Colors.indigo, brightness: Brightness.light, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark, useMaterial3: true),
-      home: MapScreen(),
+      routes: {
+        '/signin': (_) => const SignInPage(),
+        '/signup': (_) => const SignUpPage(),
+      },
+      home: const SignInPage(),
     );
   }
 }
@@ -494,6 +507,43 @@ extension _Dialogs on _MapScreenState {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('OCR failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _goToMyLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location services are disabled.')),
+        );
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied.')),
+          );
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission permanently denied.')),
+        );
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+      setState(() {
+        _current = LatLng(pos.latitude, pos.longitude);
+      });
+      mapController.move(_current!, 14);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location error: $e')),
       );
     }
   }
