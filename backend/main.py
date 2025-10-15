@@ -3,6 +3,7 @@ from datetime import datetime
 import joblib
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from paddleocr import PaddleOCR
 import shutil
@@ -40,6 +41,15 @@ except Exception as e:
 # --- Initialize FastAPI App ---
 app = FastAPI(title="Delivery Logistics API")
 
+# Enable permissive CORS so frontend apps can call the API over any WiFi / network
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Define Data Models ---
 class RouteData(BaseModel):
     ors_duration_minutes: float
@@ -71,7 +81,7 @@ class PlannedRouteResponse(BaseModel):
 # --- Geocoding and ORS Utilities ---
 # You can paste your OpenRouteService API key here. If left empty, the code
 # will fall back to reading the key from the ORS_API_KEY environment variable.
-ORS_API_KEY: str = ""
+ORS_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0="
 
 # OpenRouteService provides both routing AND geocoding services
 # FREE: 1,000 geocoding requests/day, no credit card required
@@ -168,6 +178,59 @@ def nearest_neighbor_order(matrix_dist: List[List[float]], start_index: int = 0)
         visited[next_idx] = True  # type: ignore
         current = next_idx  # type: ignore
     return order
+
+def _route_cost(matrix_dist: List[List[float]], order: List[int]) -> float:
+    total = 0.0
+    for i in range(len(order) - 1):
+        total += float(matrix_dist[order[i]][order[i + 1]])
+    return total
+
+def two_opt_improvement(matrix_dist: List[List[float]], order: List[int], max_iterations: int = 200) -> List[int]:
+    """Simple 2-opt local search to improve a given route order.
+    Keeps first and last nodes fixed; improves internal sequence for lower total distance.
+    """
+    if len(order) <= 3:
+        return order
+    best = order[:]
+    best_cost = _route_cost(matrix_dist, best)
+    n = len(order)
+    iterations = 0
+    improved = True
+    while improved and iterations < max_iterations:
+        improved = False
+        iterations += 1
+        # Do not swap the very first index to preserve start
+        for i in range(1, n - 2):
+            for k in range(i + 1, n - 1):
+                # Create new order by reversing the segment [i:k]
+                new_order = best[:i] + list(reversed(best[i:k + 1])) + best[k + 1:]
+                new_cost = _route_cost(matrix_dist, new_order)
+                if new_cost + 1e-9 < best_cost:
+                    best = new_order
+                    best_cost = new_cost
+                    improved = True
+        # loop again if improved
+    return best
+
+def _nearest_neighbor_with_start(matrix: List[List[float]], start_index: int) -> List[int]:
+    return nearest_neighbor_order(matrix, start_index)
+
+def build_best_order_multistart(matrix: List[List[float]], prefer_start: int = 0) -> List[int]:
+    """Try multiple starting points (prefer the given start) and keep the best after 2-opt."""
+    n = len(matrix)
+    if n <= 1:
+        return list(range(n))
+    start_candidates = [prefer_start] + [i for i in range(n) if i != prefer_start]
+    best_order = None
+    best_cost = float("inf")
+    for s in start_candidates[: min(6, n)]:  # limit to 6 starts for speed
+        order = _nearest_neighbor_with_start(matrix, s)
+        order = two_opt_improvement(matrix, order)
+        cost = _route_cost(matrix, order)
+        if cost < best_cost:
+            best_cost = cost
+            best_order = order
+    return best_order if best_order is not None else list(range(n))
 
 def ors_directions(api_key: str, coords_latlon_ordered: List[Tuple[float, float]]) -> Optional[Dict[str, Any]]:
     coordinates = [[lon, lat] for (lat, lon) in coords_latlon_ordered]
@@ -526,7 +589,9 @@ def plan_full_route(req: PlanRouteRequest):
             "route_geometry_geojson": None
         }
 
-    order_idx = nearest_neighbor_order(matrix["distances"], start_index)
+    # Prefer duration-based ordering when available
+    matrix_dist = matrix.get("durations") or matrix.get("distances")
+    order_idx = build_best_order_multistart(matrix_dist, start_index)
     ordered_addresses = [addresses[i] for i in order_idx]
     ordered_coords = [coords[i] for i in order_idx]
 

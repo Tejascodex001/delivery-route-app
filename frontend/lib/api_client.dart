@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
@@ -24,6 +25,18 @@ class ApiClient {
     );
     if (resp.statusCode != 200) {
       throw Exception('Backend error: ${resp.statusCode} ${resp.body}');
+    }
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> extractTextFromImage(File file) async {
+    final uri = Uri.parse('$baseUrl/ocr/extract-text');
+    final request = http.MultipartRequest('POST', uri);
+    request.files.add(await http.MultipartFile.fromPath('image', file.path));
+    final streamed = await request.send();
+    final resp = await http.Response.fromStream(streamed);
+    if (resp.statusCode != 200) {
+      throw Exception('OCR error: ${resp.statusCode} ${resp.body}');
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
