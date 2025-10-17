@@ -40,6 +40,18 @@ class ApiClient {
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
+
+  Future<List<Map<String, dynamic>>> searchSuggestions(String query) async {
+    final uri = Uri.parse('$baseUrl/search-suggestions').replace(queryParameters: {
+      'q': query,
+    });
+    final resp = await http.get(uri);
+    if (resp.statusCode != 200) {
+      throw Exception('Search error: ${resp.statusCode} ${resp.body}');
+    }
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    return List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
+  }
 }
 
 

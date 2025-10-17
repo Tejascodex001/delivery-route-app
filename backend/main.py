@@ -92,36 +92,76 @@ ORS_MATRIX_URL = "https://api.openrouteservice.org/v2/matrix/driving-car"
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     """Geocode address using OpenRouteService first (free), then Nominatim as fallback."""
     
+    # Check if address is already coordinates (lat,lon format)
+    if ',' in address and address.count(',') == 1:
+        try:
+            parts = address.strip().split(',')
+            lat = float(parts[0].strip())
+            lon = float(parts[1].strip())
+            # Validate coordinate ranges
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                logger.info(f"✅ Using provided coordinates '{address}' -> [{lat}, {lon}]")
+                return (lat, lon)
+        except ValueError:
+            pass  # Not valid coordinates, continue with geocoding
+    
     # Try OpenRouteService Geocoding API first (FREE: 1,000 requests/day)
     if ORS_API_KEY:
         try:
             url = "https://api.openrouteservice.org/geocode/search"
             headers = {"Authorization": ORS_API_KEY}
             params = {
+                "api_key": ORS_API_KEY,
                 "text": address,
                 "boundary.country": "IN",  # Focus on India
-                "size": 1
+                "size": 5  # Get more results to find better matches
             }
+            logger.info(f"🔍 ORS geocoding request for '{address}' with key: {ORS_API_KEY[:20]}...")
             resp = requests.get(url, params=params, headers=headers, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("features"):
-                    feature = data["features"][0]
-                    coordinates = feature["geometry"]["coordinates"]
+                    # Try to find the most specific match
+                    best_feature = None
+                    for feature in data["features"]:
+                        props = feature.get("properties", {})
+                        confidence = props.get("confidence", 0)
+                        layer = props.get("layer", "")
+                        
+                        # Prefer address layer for specific addresses
+                        if layer == "address" and confidence > 0.7:
+                            best_feature = feature
+                            break
+                        elif not best_feature and confidence > 0.5:
+                            best_feature = feature
+                    
+                    if not best_feature:
+                        best_feature = data["features"][0]  # Fallback to first result
+                    
+                    coordinates = best_feature["geometry"]["coordinates"]
                     lon, lat = coordinates[0], coordinates[1]
-                    logger.info(f"✅ ORS geocoded '{address}' -> [{lat}, {lon}]")
+                    props = best_feature.get("properties", {})
+                    logger.info(f"✅ ORS geocoded '{address}' -> [{lat}, {lon}] (confidence: {props.get('confidence', 'N/A')}, layer: {props.get('layer', 'N/A')})")
                     return (lat, lon)
                 else:
                     logger.warning(f"❌ ORS geocoding failed for '{address}': No features found")
             else:
                 logger.warning(f"❌ ORS API error for '{address}': HTTP {resp.status_code}")
+                logger.warning(f"   Response: {resp.text[:200]}...")
         except Exception as e:
             logger.error(f"❌ ORS geocoding error for '{address}': {e}")
     
-    # Fallback to Nominatim
+    # Fallback to Nominatim with better parameters
     logger.info(f"🔄 Trying Nominatim fallback for '{address}'")
     headers = {"User-Agent": "delivery-route-app/1.0 (contact: dev@example.com)"}
-    params = {"q": address, "format": "json", "limit": 1}
+    params = {
+        "q": address, 
+        "format": "json", 
+        "limit": 5,  # Get more results
+        "addressdetails": 1,  # Get detailed address info
+        "countrycodes": "in",  # Focus on India
+        "extratags": 1  # Get extra tags for better matching
+    }
     try:
         resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=15)
         if resp.status_code != 200:
@@ -131,9 +171,28 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
         if not data:
             logger.warning(f"❌ No geocoding results for '{address}' from any service")
             return None
-        lat = float(data[0]["lat"])  # type: ignore
-        lon = float(data[0]["lon"])  # type: ignore
-        logger.info(f"✅ Nominatim geocoded '{address}' -> [{lat}, {lon}]")
+        
+        # Try to find the best match from Nominatim results
+        best_result = None
+        for result in data:
+            importance = result.get("importance", 0)
+            osm_type = result.get("osm_type", "")
+            
+            # Prefer house/building results for specific addresses
+            if osm_type in ["way", "node"] and importance > 0.5:
+                best_result = result
+                break
+            elif not best_result and importance > 0.3:
+                best_result = result
+        
+        if not best_result:
+            best_result = data[0]  # Fallback to first result
+        
+        lat = float(best_result["lat"])  # type: ignore
+        lon = float(best_result["lon"])  # type: ignore
+        display_name = best_result.get("display_name", "Unknown")
+        logger.info(f"✅ Nominatim geocoded '{address}' -> [{lat}, {lon}] (importance: {best_result.get('importance', 'N/A')}, type: {best_result.get('osm_type', 'N/A')})")
+        logger.info(f"   Found: {display_name[:100]}...")
         return (lat, lon)
     except Exception as e:
         logger.error(f"❌ Nominatim error for '{address}': {e}")
@@ -216,21 +275,16 @@ def _nearest_neighbor_with_start(matrix: List[List[float]], start_index: int) ->
     return nearest_neighbor_order(matrix, start_index)
 
 def build_best_order_multistart(matrix: List[List[float]], prefer_start: int = 0) -> List[int]:
-    """Try multiple starting points (prefer the given start) and keep the best after 2-opt."""
+    """Always start from the preferred start point and optimize from there."""
     n = len(matrix)
     if n <= 1:
         return list(range(n))
-    start_candidates = [prefer_start] + [i for i in range(n) if i != prefer_start]
-    best_order = None
-    best_cost = float("inf")
-    for s in start_candidates[: min(6, n)]:  # limit to 6 starts for speed
-        order = _nearest_neighbor_with_start(matrix, s)
-        order = two_opt_improvement(matrix, order)
-        cost = _route_cost(matrix, order)
-        if cost < best_cost:
-            best_cost = cost
-            best_order = order
-    return best_order if best_order is not None else list(range(n))
+    
+    # Always start from the preferred start point (current location)
+    order = _nearest_neighbor_with_start(matrix, prefer_start)
+    order = two_opt_improvement(matrix, order)
+    
+    return order
 
 def ors_directions(api_key: str, coords_latlon_ordered: List[Tuple[float, float]]) -> Optional[Dict[str, Any]]:
     coordinates = [[lon, lat] for (lat, lon) in coords_latlon_ordered]
@@ -523,6 +577,66 @@ def log_route(route: CompletedRoute):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/search-suggestions")
+def search_suggestions(q: str):
+    """Get search suggestions using ORS geocoding API."""
+    if not q or len(q.strip()) < 2:
+        return {"suggestions": []}
+    
+    suggestions = []
+    
+    # Try ORS Geocoding API first
+    if ORS_API_KEY:
+        try:
+            url = "https://api.openrouteservice.org/geocode/search"
+            headers = {"Authorization": ORS_API_KEY}
+            params = {
+                "api_key": ORS_API_KEY,
+                "text": q.strip(),
+                "boundary.country": "IN",  # Focus on India
+                "size": 5
+            }
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("features"):
+                    for feature in data["features"]:
+                        props = feature.get("properties", {})
+                        coords = feature.get("geometry", {}).get("coordinates", [0, 0])
+                        suggestions.append({
+                            "display_name": props.get("label", props.get("name", "Unknown location")),
+                            "lat": coords[1],
+                            "lon": coords[0]
+                        })
+                    logger.info(f"✅ ORS found {len(suggestions)} suggestions for '{q}'")
+                    return {"suggestions": suggestions}
+        except Exception as e:
+            logger.warning(f"❌ ORS search error for '{q}': {e}")
+    
+    # Fallback to Nominatim
+    try:
+        headers = {"User-Agent": "delivery-route-app/1.0 (contact: dev@example.com)"}
+        params = {
+            "q": q.strip(),
+            "format": "json",
+            "addressdetails": "1",
+            "limit": 5
+        }
+        resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            for item in data:
+                suggestions.append({
+                    "display_name": item.get("display_name", "Unknown location"),
+                    "lat": float(item.get("lat", 0)),
+                    "lon": float(item.get("lon", 0))
+                })
+            logger.info(f"✅ Nominatim found {len(suggestions)} suggestions for '{q}'")
+    except Exception as e:
+        logger.error(f"❌ Nominatim search error for '{q}': {e}")
+    
+    return {"suggestions": suggestions}
+
 @app.post("/plan-full-route", response_model=PlannedRouteResponse)
 def plan_full_route(req: PlanRouteRequest):
     # 1) Geocode all addresses
@@ -553,14 +667,13 @@ def plan_full_route(req: PlanRouteRequest):
             }
         coords.append(c)
 
-    # Optionally geocode vehicle start and prepend
+    # Find the start index (current location should be first)
     start_index = 0
-    if req.vehicle_start_address:
-        start_coord = geocode_address(req.vehicle_start_address)
-        if start_coord is not None:
-            addresses = [req.vehicle_start_address] + addresses
-            coords = [start_coord] + coords
-            start_index = 0
+    if req.vehicle_start_address and req.vehicle_start_address in addresses:
+        start_index = addresses.index(req.vehicle_start_address)
+        logger.info(f"Found vehicle start address at index {start_index}")
+    else:
+        logger.info("Using first address as start point")
 
     # 2) Build ordering using ORS matrix (nearest neighbor heuristic)
     # Prefer in-code key; fallback to environment

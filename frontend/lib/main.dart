@@ -5,9 +5,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'api_client.dart';
 import 'auth/sign_in.dart';
 import 'auth/sign_up.dart';
+import 'auth/verify_email.dart';
+import 'services/db.dart';
+import 'services/location_service.dart';
 
 class MapScreen extends StatefulWidget {
   final void Function()? onOpenSavedRoutes;
@@ -23,15 +29,62 @@ class _MapScreenState extends State<MapScreen> {
   final api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
   final mapController = MapController();
   final TextEditingController _addrController = TextEditingController();
+  final FocusNode _addrFocus = FocusNode();
+  Timer? _debounce;
+  List<Map<String, dynamic>> _suggestions = [];
   final List<String> _addresses = [];
   List<LatLng> _ordered = [];
   List<LatLng> _polyline = [];
+  List<String> _orderedAddresses = []; // Track optimized order of addresses
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
   LatLng? _current;
+  LatLng? _currentLocation;
+  bool _showCurrentLocation = false;
 
   // Local saved routes (simple in-memory). Each item is a list of addresses.
   final List<List<String>> _savedRoutes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _addrFocus.addListener(() {
+      if (!_addrFocus.hasFocus) {
+        // Clear suggestions when search bar loses focus
+        setState(() {
+          _suggestions = [];
+        });
+      }
+    });
+    _ensureLocationOnStartup();
+  }
+
+  Future<void> _ensureLocationOnStartup() async {
+    // Run after first frame to ensure context is ready
+    await Future.delayed(const Duration(milliseconds: 100));
+    final enabled = await LocationService.isLocationEnabled();
+    var permission = await LocationService.checkPermission();
+    if (!enabled) {
+      final opened = await LocationService.openLocationSettings();
+      if (opened) {
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+    if (permission == LocationPermission.denied) {
+      permission = await LocationService.requestPermission();
+    }
+    if (!mounted) return;
+    // Try to fetch and center once available
+    final pos = await LocationService.getCurrentPosition();
+    if (!mounted) return;
+    if (pos != null) {
+      setState(() {
+        _currentLocation = LatLng(pos.latitude, pos.longitude);
+        _showCurrentLocation = true;
+      });
+      mapController.move(_currentLocation!, 15.0);
+    }
+  }
 
   void _saveCurrentRoute() {
     if (_addresses.isEmpty) return;
@@ -43,11 +96,75 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Future<void> _logout() async {
+    await DatabaseProvider.instance.clearSession();
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/signin');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    final position = await LocationService.getCurrentPosition();
+    if (position != null) {
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _showCurrentLocation = true;
+      });
+      mapController.move(_currentLocation!, 15.0);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to get current location')),
+      );
+    }
+  }
+
   void _clearCurrentRoute() {
     setState(() {
       _ordered = [];
       _polyline = [];
+      _orderedAddresses = [];
     });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _addrFocus.dispose();
+    _addrController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String text) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final q = text.trim();
+      if (q.isEmpty || q.length < 2) {
+        setState(() => _suggestions = []);
+        return;
+      }
+      try {
+        // Use backend API for secure search suggestions
+        final suggestions = await api.searchSuggestions(q);
+        setState(() => _suggestions = suggestions);
+      } catch (e) {
+        print('Search error: $e');
+        setState(() => _suggestions = []);
+      }
+    });
+  }
+
+  Future<bool> _ensureLocationInteractive() async {
+    final enabled = await LocationService.isLocationEnabled();
+    if (!enabled) {
+      final opened = await LocationService.openLocationSettings();
+      if (!opened) return false;
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    var permission = await LocationService.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await LocationService.requestPermission();
+    }
+    return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
   }
 
   Future<void> _plan() async {
@@ -56,8 +173,27 @@ class _MapScreenState extends State<MapScreen> {
       _isLoading = true;
     });
     try {
-      print('Planning route for addresses: $_addresses');
-      final res = await api.planFullRoute(addresses: _addresses);
+      // Get current location first
+      final currentPos = await LocationService.getCurrentPosition();
+      if (currentPos == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to get current location')),
+        );
+        return;
+      }
+
+      // Use actual coordinates for current location - ALWAYS FIRST
+      final currentLocationString = '${currentPos.latitude},${currentPos.longitude}';
+      final allAddresses = [currentLocationString, ..._addresses];
+      
+      print('Planning route for addresses: $allAddresses');
+      print('Current location: ${currentPos.latitude}, ${currentPos.longitude}');
+      print('Total addresses: ${allAddresses.length}');
+      
+      final res = await api.planFullRoute(
+        addresses: allAddresses,
+        vehicleStartAddress: currentLocationString,
+      );
       print('Backend response: $res');
       
       if (res['ordered_coordinates'] == null || (res['ordered_coordinates'] as List).isEmpty) {
@@ -75,8 +211,15 @@ class _MapScreenState extends State<MapScreen> {
       final coords = (res['ordered_coordinates'] as List)
           .map((e) => LatLng((e[0] as num).toDouble(), (e[1] as num).toDouble()))
           .toList();
+      final orderedAddrs = List<String>.from(res['ordered_addresses'] ?? []);
+      
+      print('Ordered addresses from backend: $orderedAddrs');
+      print('Ordered coordinates: $coords');
+      print('First coordinate (should be current location): ${coords.isNotEmpty ? coords.first : "None"}');
+      
       setState(() {
         _ordered = coords;
+        _orderedAddresses = orderedAddrs;
         _polyline = _decodeGeoJsonLineString(res['route_geometry_geojson']);
       });
       if (_ordered.isNotEmpty) {
@@ -206,6 +349,15 @@ class _MapScreenState extends State<MapScreen> {
                   _openAbout();
                 },
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Logout', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _logout();
+                },
+              ),
             ],
           ),
         ),
@@ -234,18 +386,63 @@ class _MapScreenState extends State<MapScreen> {
                     Polyline(points: _polyline, color: Theme.of(context).colorScheme.primary, strokeWidth: 6),
                 ]),
                 MarkerLayer(markers: [
+                  // Current location marker (Google Maps style)
+                  if (_showCurrentLocation && _currentLocation != null)
+                    Marker(
+                      point: _currentLocation!,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  // Route markers - always start from current location (1)
                   for (int i = 0; i < _ordered.length; i++)
                     Marker(
                       point: _ordered[i],
-                      width: 36,
-                      height: 36,
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: i == 0
-                            ? Colors.green
-                            : (i == _ordered.length - 1 ? Colors.red : Colors.orange),
-                        child: Text('${i + 1}',
-                            style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: i == 0
+                              ? Colors.green
+                              : (i == _ordered.length - 1 ? Colors.red : Colors.orange),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${i + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                 ]),
@@ -260,91 +457,161 @@ class _MapScreenState extends State<MapScreen> {
             right: 12,
             child: Column(
               children: [
-                // Search bar, pill style
-                Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(28),
-                  color: Theme.of(context).colorScheme.surface,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _addrController,
-                          decoration: InputDecoration(
-                            hintText: 'Search or add address',
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: () {
-                                final t = _addrController.text.trim();
-                                if (t.isNotEmpty) {
-                                  setState(() {
-                                    _addresses.add(t);
-                                    _addrController.clear();
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                          textAlign: TextAlign.center,
-                          onSubmitted: (_) {
-                            final t = _addrController.text.trim();
-                            if (t.isNotEmpty) {
-                              setState(() {
-                                _addresses.add(t);
-                                _addrController.clear();
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.my_location),
-                        tooltip: 'My Location',
-                        onPressed: _goToMyLocation,
+                // Material 3 Search bar with custom styling
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
+                  child: SearchBar(
+                    controller: _addrController,
+                    focusNode: _addrFocus,
+                    hintText: 'Search or add address',
+                    hintStyle: MaterialStateProperty.all(
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                    ),
+                    leading: Icon(
+                      Icons.search,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    trailing: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.my_location,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        tooltip: 'My Location',
+                        onPressed: () async {
+                          final ok = await _ensureLocationInteractive();
+                          if (!ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enable location services.')),
+                            );
+                            return;
+                          }
+                          await _getCurrentLocation();
+                        },
+                      ),
+                    ],
+                    backgroundColor: MaterialStateProperty.all(Colors.transparent),
+                    elevation: MaterialStateProperty.all(0),
+                    onChanged: (value) {
+                      _onSearchChanged(value);
+                    },
+                    onSubmitted: (value) {
+                      final t = value.trim();
+                      if (t.isNotEmpty) {
+                        setState(() {
+                          _addresses.add(t);
+                          _addrController.clear();
+                          _suggestions = [];
+                        });
+                      }
+                    },
+                  ),
                 ),
+                // Suggestions dropdown
+                if (_suggestions.isNotEmpty && _addrFocus.hasFocus)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _suggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final s = _suggestions[index];
+                        return ListTile(
+                          leading: const Icon(Icons.place_outlined),
+                          title: Text(
+                            s['display_name'] as String,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () {
+                            final display = s['display_name'] as String;
+                            setState(() {
+                              _addresses.add(display);
+                              _addrController.clear();
+                              _addrFocus.unfocus();
+                              _suggestions = [];
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 const SizedBox(height: 10),
-                // Actions row under search bar
+                // Material 3 Action buttons
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _plan,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                final ok = await _ensureLocationInteractive();
+                                if (!ok) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enable location to plan route.')),
+                                  );
+                                  return;
+                                }
+                                await _plan();
+                              },
                         icon: _isLoading
                             ? const SizedBox(
                                 width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.alt_route),
-                        label: const Text('Plan'),
+                        label: const Text('Plan Route'),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _addresses.isEmpty ? null : _saveCurrentRoute,
-                        icon: const Icon(Icons.save_alt),
+                        icon: const Icon(Icons.bookmark_add),
                         label: const Text('Save'),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton(
+                      child: OutlinedButton.icon(
                         onPressed: () {
                           setState(() {
                             _addresses.clear();
                           });
                           _clearCurrentRoute();
                         },
-                        child: const Text('Clear'),
+                        icon: const Icon(Icons.clear_all),
+                        label: const Text('Clear'),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Address chips with individual X to remove
+                // Material 3 Address chips - show optimized order
                 if (_addresses.isNotEmpty)
                   SizedBox(
                     height: 44,
@@ -353,15 +620,57 @@ class _MapScreenState extends State<MapScreen> {
                       scrollDirection: Axis.horizontal,
                       itemCount: _addresses.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) => InputChip(
-                        label: Text('${i + 1}. ${_addresses[i]}'),
-                        onDeleted: () {
-                          setState(() {
-                            _addresses.removeAt(i);
-                          });
-                          _clearCurrentRoute();
-                        },
-                      ),
+                      itemBuilder: (_, i) {
+                        // Show entry order before planning, optimized order after planning
+                        final address = _addresses[i];
+                        int displayNumber;
+                        Color chipColor;
+                        
+                        if (_orderedAddresses.isNotEmpty) {
+                          // After planning: show optimized order
+                          final optimizedIndex = _orderedAddresses.indexOf(address);
+                          if (optimizedIndex >= 0) {
+                            displayNumber = optimizedIndex + 1;
+                            chipColor = optimizedIndex == 0 
+                                ? Colors.green 
+                                : (optimizedIndex == _orderedAddresses.length - 1 
+                                    ? Colors.red 
+                                    : Colors.orange);
+                          } else {
+                            displayNumber = i + 1;
+                            chipColor = Colors.grey;
+                          }
+                        } else {
+                          // Before planning: show entry order
+                          displayNumber = i + 1;
+                          chipColor = Colors.blue;
+                        }
+                        
+                        return ActionChip(
+                          label: Text(
+                            address,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          avatar: CircleAvatar(
+                            radius: 8,
+                            backgroundColor: chipColor,
+                            child: Text(
+                              '$displayNumber',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _addresses.removeAt(i);
+                            });
+                            _clearCurrentRoute();
+                          },
+                        );
+                      },
                     ),
                   ),
               ],
@@ -395,6 +704,22 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _mode = ThemeMode.light;
+  bool _isLoading = true;
+  bool _isLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    final session = await DatabaseProvider.instance.getSession();
+    setState(() {
+      _isLoggedIn = session != null;
+      _isLoading = false;
+    });
+  }
 
   void _toggleTheme(bool isDark) {
     setState(() {
@@ -406,13 +731,36 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       themeMode: _mode,
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, brightness: Brightness.light, useMaterial3: true),
-      darkTheme: ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark, useMaterial3: true),
+      theme: ThemeData(
+        colorSchemeSeed: Colors.blue,
+        brightness: Brightness.light,
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+      ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.cyan,
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+      ),
       routes: {
         '/signin': (_) => const SignInPage(),
         '/signup': (_) => const SignUpPage(),
+        '/verify-email': (_) => const VerifyEmailPage(),
       },
-      home: const SignInPage(),
+      home: _isLoading 
+          ? const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            )
+          : _isLoggedIn 
+              ? const MapScreen() 
+              : const SignInPage(),
     );
   }
 }
