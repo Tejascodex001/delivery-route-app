@@ -15,6 +15,7 @@ from PIL import Image
 import logging
 from typing import List, Optional, Tuple, Dict, Any
 import requests
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,34 @@ except Exception as e:
     logger.warning(f"Could not load ML models: {e}")
     eta_model = None
     model_columns = None
+
+# --- Initialize Training Data Database ---
+def init_training_db():
+    conn = sqlite3.connect('training_data.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS training_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            route_id TEXT UNIQUE NOT NULL,
+            addresses TEXT NOT NULL,
+            coordinates TEXT NOT NULL,
+            predicted_eta_minutes REAL NOT NULL,
+            actual_eta_minutes REAL,
+            start_time TEXT NOT NULL,
+            end_time TEXT,
+            sensor_data TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            route_metadata TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    logger.info("Training data database initialized")
+
+init_training_db()
 
 # --- Initialize PaddleOCR ---
 try:
@@ -69,6 +98,22 @@ class PlanRouteRequest(BaseModel):
     start_time: Optional[str] = None  # ISO8601 string; if omitted, uses now
     vehicle_start_address: Optional[str] = None  # if omitted, uses first address as start
 
+class TrainingDataRequest(BaseModel):
+    route_id: str
+    addresses: List[str]
+    coordinates: List[List[float]]
+    predicted_eta_minutes: float
+    actual_eta_minutes: Optional[float] = None
+    start_time: str
+    end_time: Optional[str] = None
+    sensor_data: List[Dict[str, Any]]
+    user_id: str
+    route_metadata: Dict[str, Any]
+
+class UpdateEtaRequest(BaseModel):
+    route_id: str
+    actual_eta_minutes: float
+
 class PlannedRouteResponse(BaseModel):
     ordered_addresses: List[str]
     ordered_coordinates: List[Tuple[float, float]]  # (lat, lon)
@@ -82,6 +127,10 @@ class PlannedRouteResponse(BaseModel):
 # You can paste your OpenRouteService API key here. If left empty, the code
 # will fall back to reading the key from the ORS_API_KEY environment variable.
 ORS_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0="
+
+# Traffic data API keys (optional - for real-time traffic)
+MAPMYINDIA_API_KEY: str = ""  # Add your MapmyIndia API key here
+TRAFFIC_API_KEY: str = ""     # Add your traffic API key here
 
 # OpenRouteService provides both routing AND geocoding services
 # FREE: 1,000 geocoding requests/day, no credit card required
@@ -280,11 +329,76 @@ def build_best_order_multistart(matrix: List[List[float]], prefer_start: int = 0
     if n <= 1:
         return list(range(n))
     
-    # Always start from the preferred start point (current location)
-    order = _nearest_neighbor_with_start(matrix, prefer_start)
-    order = two_opt_improvement(matrix, order)
+    # For delivery routes, use simple sequential order starting from current location
+    # This ensures we visit all stops in the order they were added
+    if prefer_start == 0:
+        # If starting from current location (index 0), use sequential order
+        order = list(range(n))
+        logger.info(f"📍 Using sequential delivery order: {order}")
+    else:
+        # For other cases, use nearest neighbor with 2-opt
+        order = _nearest_neighbor_with_start(matrix, prefer_start)
+        order = two_opt_improvement(matrix, order)
+        logger.info(f"📍 Using optimized order: {order}")
     
     return order
+
+def get_traffic_multiplier(lat: float, lon: float, time_of_day: str = None) -> float:
+    """Get traffic multiplier based on location and time."""
+    try:
+        # For now, use time-based multipliers until we integrate real traffic APIs
+        current_hour = datetime.now().hour
+        
+        # Peak hours in India (adjust based on your city)
+        if 7 <= current_hour <= 10 or 17 <= current_hour <= 20:  # Rush hours
+            base_multiplier = 2.2
+        elif 10 <= current_hour <= 17:  # Daytime
+            base_multiplier = 1.8
+        elif 20 <= current_hour <= 23:  # Evening
+            base_multiplier = 1.5
+        else:  # Night/Early morning
+            base_multiplier = 1.2
+        
+        # Location-based adjustments (you can expand this)
+        # Bangalore traffic is generally heavier
+        if 12.5 <= lat <= 13.5 and 77.0 <= lon <= 78.0:  # Bangalore area
+            base_multiplier *= 1.1
+        
+        # Mumbai traffic
+        elif 18.5 <= lat <= 19.5 and 72.5 <= lon <= 73.5:  # Mumbai area
+            base_multiplier *= 1.2
+        
+        # Delhi traffic
+        elif 28.0 <= lat <= 29.0 and 76.5 <= lon <= 77.5:  # Delhi area
+            base_multiplier *= 1.15
+        
+        logger.info(f"🚦 Traffic multiplier: {base_multiplier:.2f} (hour: {current_hour}, location: {lat:.3f}, {lon:.3f})")
+        return base_multiplier
+        
+    except Exception as e:
+        logger.warning(f"❌ Error calculating traffic multiplier: {e}")
+        return 1.8  # Default fallback
+
+def get_real_time_traffic_data(lat: float, lon: float) -> Optional[Dict[str, Any]]:
+    """Get real-time traffic data from external APIs."""
+    try:
+        # MapmyIndia Traffic API (if key is available)
+        if MAPMYINDIA_API_KEY:
+            # Implementation for MapmyIndia traffic API
+            # This would require their specific API endpoints
+            pass
+        
+        # Alternative traffic API (if key is available)
+        if TRAFFIC_API_KEY:
+            # Implementation for other traffic APIs
+            pass
+        
+        # For now, return None to use time-based multipliers
+        return None
+        
+    except Exception as e:
+        logger.warning(f"❌ Error getting real-time traffic data: {e}")
+        return None
 
 def ors_directions(api_key: str, coords_latlon_ordered: List[Tuple[float, float]]) -> Optional[Dict[str, Any]]:
     coordinates = [[lon, lat] for (lat, lon) in coords_latlon_ordered]
@@ -702,28 +816,123 @@ def plan_full_route(req: PlanRouteRequest):
             "route_geometry_geojson": None
         }
 
-    # Prefer duration-based ordering when available
-    matrix_dist = matrix.get("durations") or matrix.get("distances")
-    order_idx = build_best_order_multistart(matrix_dist, start_index)
-    ordered_addresses = [addresses[i] for i in order_idx]
-    ordered_coords = [coords[i] for i in order_idx]
+    # For delivery routes, use original order (no optimization)
+    # This ensures we visit stops in the order they were added
+    if start_index == 0:
+        # Sequential delivery order: Current → Stop 1 → Stop 2 → Stop 3
+        order_idx = list(range(len(addresses)))
+        ordered_addresses = addresses.copy()
+        ordered_coords = coords.copy()
+        logger.info(f"📍 Using sequential delivery order (no optimization):")
+        logger.info(f"  Order: {order_idx}")
+        logger.info(f"  Addresses: {ordered_addresses}")
+        logger.info(f"  Coordinates: {ordered_coords}")
+    else:
+        # Use matrix-based optimization for other cases
+        matrix_dist = matrix.get("durations") or matrix.get("distances")
+        order_idx = build_best_order_multistart(matrix_dist, start_index)
+        ordered_addresses = [addresses[i] for i in order_idx]
+        ordered_coords = [coords[i] for i in order_idx]
+        logger.info(f"📍 Using matrix-based optimization:")
+        logger.info(f"  Original order: {list(range(len(addresses)))}")
+        logger.info(f"  Optimized order: {order_idx}")
+        logger.info(f"  Addresses: {ordered_addresses}")
+        logger.info(f"  Coordinates: {ordered_coords}")
 
-    # 3) Directions for full path, get distance and duration
-    directions = ors_directions(ors_key, ordered_coords)
+    # 3) Calculate proper multi-stop route duration
+    num_stops = len(ordered_addresses)
     total_distance_km = 0.0
     ors_duration_minutes = 0.0
     route_geojson = None
-    try:
+    
+    # Calculate total duration by summing individual segments
+    logger.info(f"🚚 Calculating linear delivery route:")
+    logger.info(f"  Total stops: {num_stops}")
+    logger.info(f"  Route: Current → {ordered_addresses[1:] if len(ordered_addresses) > 1 else 'No stops'}")
+    logger.info(f"  Final destination: {ordered_addresses[-1] if ordered_addresses else 'None'}")
+    
+    if num_stops >= 2:
+        # Calculate duration for each segment in the optimized route
+        total_segment_duration = 0.0
+        total_segment_distance = 0.0
+        
+        for i in range(num_stops - 1):
+            start_coord = ordered_coords[i]
+            end_coord = ordered_coords[i + 1]
+            
+            # Get directions for this segment
+            segment_directions = ors_directions(ors_key, [start_coord, end_coord])
+            
+            if segment_directions and "features" in segment_directions and len(segment_directions["features"]) > 0:
+                feat = segment_directions["features"][0]
+                summary = feat.get("properties", {}).get("summary", {})
+                segment_distance = float(summary.get("distance", 0.0))
+                segment_duration = float(summary.get("duration", 0.0)) / 60.0  # Convert to minutes
+                
+                # Apply dynamic traffic multiplier based on location and time
+                # Get the midpoint of the segment for traffic calculation
+                mid_lat = (start_coord[0] + end_coord[0]) / 2
+                mid_lon = (start_coord[1] + end_coord[1]) / 2
+                
+                # Try to get real-time traffic data first
+                real_time_traffic = get_real_time_traffic_data(mid_lat, mid_lon)
+                if real_time_traffic:
+                    # Use real-time traffic data if available
+                    traffic_multiplier = real_time_traffic.get('multiplier', 1.8)
+                    logger.info(f"    Using real-time traffic multiplier: {traffic_multiplier:.2f}")
+                else:
+                    # Fallback to time and location-based multiplier
+                    traffic_multiplier = get_traffic_multiplier(mid_lat, mid_lon)
+                
+                segment_duration *= traffic_multiplier
+                
+                total_segment_duration += segment_duration
+                total_segment_distance += segment_distance
+                
+                raw_duration = segment_duration / traffic_multiplier
+                logger.info(f"  Segment {i+1}: {ordered_addresses[i]} → {ordered_addresses[i+1]}")
+                logger.info(f"    Coordinates: {start_coord} → {end_coord}")
+                logger.info(f"    Distance: {segment_distance:.2f} km")
+                logger.info(f"    Raw ORS duration: {raw_duration:.2f} min")
+                logger.info(f"    Adjusted duration: {segment_duration:.2f} min (×{traffic_multiplier})")
+                
+                # Debug: Also test the reverse direction to see if there's a difference
+                reverse_directions = ors_directions(ors_key, [end_coord, start_coord])
+                if reverse_directions and "features" in reverse_directions and len(reverse_directions["features"]) > 0:
+                    reverse_feat = reverse_directions["features"][0]
+                    reverse_summary = reverse_feat.get("properties", {}).get("summary", {})
+                    reverse_duration = float(reverse_summary.get("duration", 0.0)) / 60.0
+                    logger.info(f"    Reverse duration: {reverse_duration:.2f} min (difference: {abs(segment_duration - reverse_duration):.2f} min)")
+            else:
+                logger.warning(f"  Failed to get directions for segment {i+1}")
+        
+        # Add delivery time at each stop (except the last one)
+        delivery_time_per_stop = 2.0  # 2 minutes per stop for delivery
+        total_delivery_time = (num_stops - 1) * delivery_time_per_stop
+        
+        # This is a linear delivery route (not round trip)
+        # Route: Current → Stop A → Stop B → Stop C (final destination)
+        # No return journey calculation needed
+        
+        ors_duration_minutes = total_segment_duration + total_delivery_time
+        
+        logger.info(f"  Total driving time: {total_segment_duration:.2f} min")
+        logger.info(f"  Total delivery time: {total_delivery_time:.2f} min")
+        logger.info(f"  Total route time: {ors_duration_minutes:.2f} min")
+        logger.info(f"  Total distance: {total_distance_km:.2f} km")
+        
+        # Debug: Compare with Google Maps expectations
+        logger.info(f"🔍 Route Analysis:")
+        logger.info(f"  Expected Google Maps: Current→GAT (8min) + GAT→BMS (24min) = 32min")
+        logger.info(f"  Our calculation: {ors_duration_minutes:.2f} min")
+        logger.info(f"  Difference: {ors_duration_minutes - 32:.2f} min")
+        
+        # Get the full route geometry for display (from start to end)
+        directions = ors_directions(ors_key, ordered_coords)
         if directions and "features" in directions and len(directions["features"]) > 0:
-            feat = directions["features"][0]
-            route_geojson = feat
-            summary = feat.get("properties", {}).get("summary", {})
-            total_distance_km = float(summary.get("distance", 0.0))  # already in km
-            ors_duration_minutes = float(summary.get("duration", 0.0)) / 60.0
-    except Exception as e:
-        logger.warning(f"Failed to parse ORS directions summary: {e}")
-
-    num_stops = len(ordered_addresses)
+            route_geojson = directions["features"][0]
+    else:
+        logger.warning("Need at least 2 stops for route calculation")
 
     # 4) Predict ETA using our ML model (if loaded)
     predicted_eta = None
@@ -750,8 +959,24 @@ def plan_full_route(req: PlanRouteRequest):
             input_df = input_df.reindex(columns=model_columns, fill_value=0)
             pred = eta_model.predict(input_df)
             predicted_eta = float(pred[0])
+            
+            # Check if ML prediction is reasonable (not more than 2x ORS duration)
+            if predicted_eta > ors_duration_minutes * 2:
+                logger.warning(f"ML prediction seems too high: {predicted_eta:.1f} min vs ORS: {ors_duration_minutes:.1f} min")
+                # Use ORS duration with a small buffer for traffic
+                predicted_eta = ors_duration_minutes * 1.2  # 20% buffer for traffic
+                logger.info(f"Using ORS-based prediction: {predicted_eta:.1f} min")
+            else:
+                logger.info(f"ML prediction: {predicted_eta:.1f} min, ORS duration: {ors_duration_minutes:.1f} min")
+        else:
+            # Fallback to ORS duration with traffic buffer
+            predicted_eta = ors_duration_minutes * 1.2  # 20% buffer for traffic
+            logger.info(f"Using ORS-based fallback prediction: {predicted_eta:.1f} min")
     except Exception as e:
         logger.warning(f"ETA prediction failed: {e}")
+        # Fallback to ORS duration with traffic buffer
+        predicted_eta = ors_duration_minutes * 1.2  # 20% buffer for traffic
+        logger.info(f"Using ORS-based fallback after error: {predicted_eta:.1f} min")
 
     return {
         "ordered_addresses": ordered_addresses,
@@ -764,6 +989,259 @@ def plan_full_route(req: PlanRouteRequest):
     }
 
 # Run the app
+@app.post("/submit-training-data")
+def submit_training_data(data: TrainingDataRequest):
+    """Submit training data for model improvement."""
+    try:
+        conn = sqlite3.connect('training_data.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO training_data 
+            (route_id, addresses, coordinates, predicted_eta_minutes, actual_eta_minutes,
+             start_time, end_time, sensor_data, user_id, route_metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.route_id,
+            json.dumps(data.addresses),
+            json.dumps(data.coordinates),
+            data.predicted_eta_minutes,
+            data.actual_eta_minutes,
+            data.start_time,
+            data.end_time,
+            json.dumps(data.sensor_data),
+            data.user_id,
+            json.dumps(data.route_metadata)
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Training data submitted for route {data.route_id}")
+        return {"status": "success", "message": "Training data submitted successfully"}
+        
+    except Exception as e:
+        logger.error(f"❌ Error submitting training data: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.patch("/update-actual-eta")
+def update_actual_eta(data: UpdateEtaRequest):
+    """Update actual ETA for a completed route."""
+    try:
+        conn = sqlite3.connect('training_data.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE training_data 
+            SET actual_eta_minutes = ?, end_time = ?
+            WHERE route_id = ?
+        ''', (data.actual_eta_minutes, datetime.now().isoformat(), data.route_id))
+        
+        if cursor.rowcount == 0:
+            conn.close()
+            return {"status": "error", "message": "Route not found"}
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"✅ Actual ETA updated for route {data.route_id}: {data.actual_eta_minutes} minutes")
+        return {"status": "success", "message": "Actual ETA updated successfully"}
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating actual ETA: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/training-data-stats")
+def get_training_data_stats():
+    """Get statistics about collected training data."""
+    try:
+        conn = sqlite3.connect('training_data.db')
+        cursor = conn.cursor()
+        
+        # Get total routes
+        cursor.execute("SELECT COUNT(*) FROM training_data")
+        total_routes = cursor.fetchone()[0]
+        
+        # Get routes with actual ETA
+        cursor.execute("SELECT COUNT(*) FROM training_data WHERE actual_eta_minutes IS NOT NULL")
+        completed_routes = cursor.fetchone()[0]
+        
+        # Get average prediction accuracy
+        cursor.execute('''
+            SELECT AVG(ABS(predicted_eta_minutes - actual_eta_minutes)) 
+            FROM training_data 
+            WHERE actual_eta_minutes IS NOT NULL
+        ''')
+        avg_error = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return {
+            "total_routes": total_routes,
+            "completed_routes": completed_routes,
+            "average_prediction_error_minutes": round(avg_error, 2) if avg_error else None
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting training data stats: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/test-segment")
+def test_segment(from_addr: str, to_addr: str):
+    """Test a single segment to verify ORS calculation."""
+    try:
+        logger.info(f"🔍 Testing segment: {from_addr} → {to_addr}")
+        
+        # Geocode both addresses
+        from_coord = geocode_address(from_addr.strip())
+        to_coord = geocode_address(to_addr.strip())
+        
+        if not from_coord or not to_coord:
+            return {"error": "Failed to geocode addresses"}
+        
+        logger.info(f"  From: {from_coord}")
+        logger.info(f"  To: {to_coord}")
+        
+        # Get ORS directions
+        ors_key = ORS_API_KEY or os.environ.get("ORS_API_KEY", "")
+        if not ors_key:
+            return {"error": "ORS API key not set"}
+        
+        directions = ors_directions(ors_key, [from_coord, to_coord])
+        if not directions or "features" not in directions or len(directions["features"]) == 0:
+            return {"error": "Failed to get ORS directions"}
+        
+        feat = directions["features"][0]
+        summary = feat.get("properties", {}).get("summary", {})
+        distance = float(summary.get("distance", 0.0))
+        duration = float(summary.get("duration", 0.0)) / 60.0
+        
+        logger.info(f"  ORS Result: {distance:.2f} km, {duration:.2f} min")
+        
+        return {
+            "from": from_addr,
+            "to": to_addr,
+            "from_coordinates": from_coord,
+            "to_coordinates": to_coord,
+            "distance_km": round(distance, 2),
+            "duration_minutes": round(duration, 2),
+            "google_maps_estimate": "Check manually in Google Maps"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Test segment error: {e}")
+        return {"error": str(e)}
+
+@app.get("/traffic-config")
+def get_traffic_config():
+    """Get current traffic configuration and multipliers."""
+    current_hour = datetime.now().hour
+    
+    # Determine current time period
+    if 7 <= current_hour <= 10 or 17 <= current_hour <= 20:
+        time_period = "Rush Hours"
+        base_multiplier = 2.2
+    elif 10 <= current_hour <= 17:
+        time_period = "Daytime"
+        base_multiplier = 1.8
+    elif 20 <= current_hour <= 23:
+        time_period = "Evening"
+        base_multiplier = 1.5
+    else:
+        time_period = "Night/Early Morning"
+        base_multiplier = 1.2
+    
+    return {
+        "current_time": datetime.now().isoformat(),
+        "current_hour": current_hour,
+        "time_period": time_period,
+        "base_multiplier": base_multiplier,
+        "location_adjustments": {
+            "bangalore": 1.1,
+            "mumbai": 1.2,
+            "delhi": 1.15
+        },
+        "real_time_traffic_available": bool(MAPMYINDIA_API_KEY or TRAFFIC_API_KEY),
+        "apis_configured": {
+            "mapmyindia": bool(MAPMYINDIA_API_KEY),
+            "traffic_api": bool(TRAFFIC_API_KEY)
+        }
+    }
+
+@app.get("/debug-route")
+def debug_route(addresses: str):
+    """Debug endpoint to check route calculation details."""
+    try:
+        address_list = addresses.split(',')
+        logger.info(f"🔍 Debug route for: {address_list}")
+        
+        # Geocode addresses
+        coords = []
+        for addr in address_list:
+            coord = geocode_address(addr.strip())
+            if coord:
+                coords.append(coord)
+                logger.info(f"  {addr.strip()} -> {coord}")
+            else:
+                logger.warning(f"  Failed to geocode: {addr.strip()}")
+        
+        if len(coords) < 2:
+            return {"error": "Need at least 2 valid addresses"}
+        
+        # Get ORS matrix
+        ors_key = ORS_API_KEY or os.environ.get("ORS_API_KEY", "")
+        if not ors_key:
+            return {"error": "ORS API key not set"}
+        
+        matrix = ors_matrix(ors_key, coords)
+        if not matrix:
+            return {"error": "Failed to get ORS matrix"}
+        
+        # Test individual segments
+        segment_results = []
+        for i in range(len(coords) - 1):
+            start_coord = coords[i]
+            end_coord = coords[i + 1]
+            
+            segment_directions = ors_directions(ors_key, [start_coord, end_coord])
+            if segment_directions and "features" in segment_directions and len(segment_directions["features"]) > 0:
+                feat = segment_directions["features"][0]
+                summary = feat.get("properties", {}).get("summary", {})
+                segment_distance = float(summary.get("distance", 0.0))
+                segment_duration = float(summary.get("duration", 0.0)) / 60.0
+                
+                segment_results.append({
+                    "from": address_list[i],
+                    "to": address_list[i + 1],
+                    "distance_km": round(segment_distance, 2),
+                    "duration_minutes": round(segment_duration, 2)
+                })
+        
+        # Get full route directions
+        directions = ors_directions(ors_key, coords)
+        ors_duration = 0.0
+        total_distance = 0.0
+        
+        if directions and "features" in directions:
+            feat = directions["features"][0]
+            summary = feat.get("properties", {}).get("summary", {})
+            total_distance = float(summary.get("distance", 0.0))
+            ors_duration = float(summary.get("duration", 0.0)) / 60.0
+        
+        return {
+            "addresses": address_list,
+            "coordinates": coords,
+            "individual_segments": segment_results,
+            "full_route_duration_minutes": round(ors_duration, 2),
+            "full_route_distance_km": round(total_distance, 3),
+            "matrix_available": "durations" in matrix or "distances" in matrix,
+            "google_maps_estimate": "Check manually in Google Maps"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Debug route error: {e}")
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

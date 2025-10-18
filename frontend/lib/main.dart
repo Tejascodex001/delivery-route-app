@@ -14,6 +14,8 @@ import 'auth/sign_up.dart';
 import 'auth/verify_email.dart';
 import 'services/db.dart';
 import 'services/location_service.dart';
+import 'services/sensor_service.dart';
+import 'services/training_data_service.dart';
 
 class MapScreen extends StatefulWidget {
   final void Function()? onOpenSavedRoutes;
@@ -41,6 +43,13 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? _current;
   LatLng? _currentLocation;
   bool _showCurrentLocation = false;
+  
+  // Training data and sensor collection
+  final SensorService _sensorService = SensorService();
+  final TrainingDataService _trainingService = TrainingDataService();
+  String? _currentRouteId;
+  DateTime? _routeStartTime;
+  double? _predictedEtaMinutes;
 
   // Local saved routes (simple in-memory). Each item is a list of addresses.
   final List<List<String>> _savedRoutes = [];
@@ -56,7 +65,13 @@ class _MapScreenState extends State<MapScreen> {
         });
       }
     });
+    _initializeServices();
     _ensureLocationOnStartup();
+  }
+
+  Future<void> _initializeServices() async {
+    await _sensorService.initialize();
+    _sensorService.startSensorCollection();
   }
 
   Future<void> _ensureLocationOnStartup() async {
@@ -123,7 +138,57 @@ class _MapScreenState extends State<MapScreen> {
       _ordered = [];
       _polyline = [];
       _orderedAddresses = [];
+      _predictedEtaMinutes = null;
     });
+    _currentRouteId = null;
+    _routeStartTime = null;
+  }
+
+  Future<void> _submitTrainingData(Map<String, dynamic> routeResponse, List<LatLng> coords, List<String> orderedAddrs) async {
+    if (_currentRouteId == null || _routeStartTime == null) return;
+    
+    try {
+      final coordinates = coords.map((c) => [c.latitude, c.longitude]).toList();
+      final sensorData = _sensorService.getSensorData();
+      
+      final trainingData = TrainingData(
+        routeId: _currentRouteId!,
+        addresses: orderedAddrs,
+        coordinates: coordinates,
+        predictedEtaMinutes: _predictedEtaMinutes ?? 0.0,
+        startTime: _routeStartTime!.toIso8601String(),
+        sensorData: sensorData,
+        userId: 'user_${DateTime.now().millisecondsSinceEpoch}', // Simple user ID for now
+        routeMetadata: {
+          'total_distance_km': routeResponse['total_distance_km'] ?? 0.0,
+          'ors_duration_minutes': routeResponse['ors_duration_minutes'] ?? 0.0,
+          'num_stops': routeResponse['num_stops'] ?? 0,
+          'device_info': {
+            'platform': Platform.operatingSystem,
+            'version': Platform.operatingSystemVersion,
+          }
+        },
+      );
+      
+      await _trainingService.submitTrainingData(trainingData);
+      print('✅ Training data submitted for route $_currentRouteId');
+    } catch (e) {
+      print('❌ Error submitting training data: $e');
+    }
+  }
+
+  String _formatEta(double minutes) {
+    if (minutes < 60) {
+      return '${minutes.round()} min';
+    } else {
+      final hours = (minutes / 60).floor();
+      final remainingMinutes = (minutes % 60).round();
+      if (remainingMinutes == 0) {
+        return '${hours}h';
+      } else {
+        return '${hours}h ${remainingMinutes}m';
+      }
+    }
   }
 
   @override
@@ -131,6 +196,7 @@ class _MapScreenState extends State<MapScreen> {
     _debounce?.cancel();
     _addrFocus.dispose();
     _addrController.dispose();
+    _sensorService.stopSensorCollection();
     super.dispose();
   }
 
@@ -212,10 +278,20 @@ class _MapScreenState extends State<MapScreen> {
           .map((e) => LatLng((e[0] as num).toDouble(), (e[1] as num).toDouble()))
           .toList();
       final orderedAddrs = List<String>.from(res['ordered_addresses'] ?? []);
+      final predictedEta = res['predicted_eta_minutes'] as double?;
       
       print('Ordered addresses from backend: $orderedAddrs');
       print('Ordered coordinates: $coords');
+      print('Predicted ETA: $predictedEta minutes');
       print('First coordinate (should be current location): ${coords.isNotEmpty ? coords.first : "None"}');
+      
+      // Generate route ID and start data collection
+      _currentRouteId = _trainingService.generateRouteId();
+      _routeStartTime = DateTime.now();
+      _predictedEtaMinutes = predictedEta;
+      
+      // Submit initial training data
+      await _submitTrainingData(res, coords, orderedAddrs);
       
       setState(() {
         _ordered = coords;
@@ -677,19 +753,125 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // Bottom nav button
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 12,
-            child: SafeArea(
-              child: ElevatedButton.icon(
-                onPressed: _ordered.length >= 2 ? _openExternalNav : null,
-                icon: const Icon(Icons.navigation),
-                label: const Text('Start Navigation (Google Maps)'),
+          // ETA Display Card (Material You style)
+          if (_predictedEtaMinutes != null)
+            Positioned(
+              top: 120,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.schedule,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'AI Predicted ETA',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _formatEta(_predictedEtaMinutes!),
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _predictedEtaMinutes = null;
+                            });
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    if (_ordered.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _openExternalNav,
+                              icon: const Icon(Icons.navigation),
+                              label: const Text('Start Navigation'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                // Clear current route but keep addresses for adding more
+                                setState(() {
+                                  _ordered = [];
+                                  _polyline = [];
+                                  _orderedAddresses = [];
+                                  _predictedEtaMinutes = null;
+                                });
+                                _currentRouteId = null;
+                                _routeStartTime = null;
+                              },
+                              icon: const Icon(Icons.add_location),
+                              label: const Text('Add More'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
+
+          // Bottom nav button (fallback if no ETA)
+          if (_ordered.isNotEmpty && _predictedEtaMinutes == null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: SafeArea(
+                child: FilledButton.icon(
+                  onPressed: _ordered.length >= 2 ? _openExternalNav : null,
+                  icon: const Icon(Icons.navigation),
+                  label: const Text('Start Navigation'),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -739,6 +921,25 @@ class _MyAppState extends State<MyApp> {
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
+        // Material You components
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+        ),
+        chipTheme: ChipThemeData(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        searchBarTheme: SearchBarThemeData(
+          shape: MaterialStateProperty.all(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         colorSchemeSeed: Colors.cyan,
@@ -747,6 +948,25 @@ class _MyAppState extends State<MyApp> {
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
+        ),
+        // Material You components
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+        ),
+        chipTheme: ChipThemeData(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        searchBarTheme: SearchBarThemeData(
+          shape: MaterialStateProperty.all(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          ),
         ),
       ),
       routes: {
