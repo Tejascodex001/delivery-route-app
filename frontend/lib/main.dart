@@ -34,6 +34,7 @@ class _MapScreenState extends State<MapScreen> {
   final FocusNode _addrFocus = FocusNode();
   Timer? _debounce;
   List<Map<String, dynamic>> _suggestions = [];
+  List<Map<String, dynamic>> _nearbyPlaces = [];
   final List<String> _addresses = [];
   List<LatLng> _ordered = [];
   List<LatLng> _polyline = [];
@@ -58,10 +59,14 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _addrFocus.addListener(() {
-      if (!_addrFocus.hasFocus) {
+      if (_addrFocus.hasFocus) {
+        // Load nearby places when search bar gains focus
+        _loadNearbyPlaces();
+      } else {
         // Clear suggestions when search bar loses focus
         setState(() {
           _suggestions = [];
+          _nearbyPlaces = [];
         });
       }
     });
@@ -191,6 +196,172 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _showImageSourceDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Scan Address'),
+          content: const Text('Choose how you want to add the address:'),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImageFromCamera();
+              },
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Take Photo'),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImageFromGallery();
+              },
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Choose from Gallery'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        await _processImage(File(image.path));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Camera error: $e')),
+      );
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        await _processImage(File(image.path));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gallery error: $e')),
+      );
+    }
+  }
+
+  Future<void> _processImage(File imageFile) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final result = await api.extractTextFromImage(imageFile);
+      final extractedText = result['extracted_text'] as String?;
+      
+      if (extractedText != null && extractedText.isNotEmpty) {
+        // Show extracted text and let user confirm
+        final confirmed = await _showExtractedTextDialog(extractedText);
+        if (confirmed) {
+          setState(() {
+            _addresses.add(extractedText);
+          });
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No text found in the image')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('OCR error: $e')),
+      );
+    } finally {
+      if (mounted) setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<bool> _showExtractedTextDialog(String extractedText) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Extracted Address'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('We found this address:'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  extractedText,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('Would you like to add this address?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Add Address'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+
+  IconData _getAmenityIcon(String amenity) {
+    switch (amenity) {
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'hospital':
+        return Icons.local_hospital;
+      case 'school':
+        return Icons.school;
+      case 'university':
+        return Icons.account_balance;
+      case 'bank':
+        return Icons.account_balance;
+      case 'fuel':
+        return Icons.local_gas_station;
+      case 'parking':
+        return Icons.local_parking;
+      case 'pharmacy':
+        return Icons.local_pharmacy;
+      case 'post_office':
+        return Icons.local_post_office;
+      case 'police':
+        return Icons.local_police;
+      case 'fire_station':
+        return Icons.local_fire_department;
+      default:
+        return Icons.place;
+    }
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -200,9 +371,27 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
+  Future<void> _loadNearbyPlaces() async {
+    if (_currentLocation == null) return;
+    
+    try {
+      final places = await api.getNearbyPlaces(
+        _currentLocation!.latitude, 
+        _currentLocation!.longitude,
+        radius: 3000, // 3km radius
+      );
+      setState(() {
+        _nearbyPlaces = places;
+      });
+    } catch (e) {
+      print('Nearby places error: $e');
+      setState(() => _nearbyPlaces = []);
+    }
+  }
+
   void _onSearchChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () async {
+    _debounce = Timer(const Duration(milliseconds: 200), () async { // Reduced from 350ms
       final q = text.trim();
       if (q.isEmpty || q.length < 2) {
         setState(() => _suggestions = []);
@@ -379,7 +568,26 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Delivery Route Optimizer')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.route,
+                color: Theme.of(context).colorScheme.onPrimary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('RouteOptimizer'),
+          ],
+        ),
+      ),
       drawer: Drawer(
         child: SafeArea(
           child: Column(
@@ -398,14 +606,6 @@ class _MapScreenState extends State<MapScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _openSavedRoutesPage();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.document_scanner),
-                title: const Text('Import via OCR'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _pickAndUploadImage();
                 },
               ),
               const Divider(),
@@ -457,7 +657,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 PolylineLayer(polylines: [
                   if (_polyline.isNotEmpty)
-                    Polyline(points: _polyline, color: Colors.black.withOpacity(0.25), strokeWidth: 9),
+                    Polyline(points: _polyline, color: Colors.black.withValues(alpha: 0.25), strokeWidth: 9),
                   if (_polyline.isNotEmpty)
                     Polyline(points: _polyline, color: Theme.of(context).colorScheme.primary, strokeWidth: 6),
                 ]),
@@ -475,7 +675,7 @@ class _MapScreenState extends State<MapScreen> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.blue.withOpacity(0.3),
+                              color: Colors.blue.withValues(alpha: 0.3),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -503,7 +703,7 @@ class _MapScreenState extends State<MapScreen> {
                           border: Border.all(color: Colors.white, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -540,7 +740,7 @@ class _MapScreenState extends State<MapScreen> {
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -550,34 +750,46 @@ class _MapScreenState extends State<MapScreen> {
                     controller: _addrController,
                     focusNode: _addrFocus,
                     hintText: 'Search or add address',
-                    hintStyle: MaterialStateProperty.all(
-                      TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                    hintStyle: WidgetStatePropertyAll(
+                      TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
                     ),
                     leading: Icon(
                       Icons.search,
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    trailing: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.my_location,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        tooltip: 'My Location',
-                        onPressed: () async {
-                          final ok = await _ensureLocationInteractive();
-                          if (!ok) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enable location services.')),
-                            );
-                            return;
-                          }
-                          await _getCurrentLocation();
-                        },
-                      ),
-                    ],
-                    backgroundColor: MaterialStateProperty.all(Colors.transparent),
-                    elevation: MaterialStateProperty.all(0),
+                            trailing: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.camera_alt,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                tooltip: 'Scan Address',
+                                onPressed: _showImageSourceDialog,
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.my_location,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                tooltip: 'My Location',
+                                onPressed: () async {
+                                  final ok = await _ensureLocationInteractive();
+                                  if (!ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please enable location services.')),
+                                    );
+                                    return;
+                                  }
+                                  await _getCurrentLocation();
+                                },
+                              ),
+                            ],
+                    backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+                    elevation: const WidgetStatePropertyAll(0.0),
                     onChanged: (value) {
                       _onSearchChanged(value);
                     },
@@ -593,47 +805,104 @@ class _MapScreenState extends State<MapScreen> {
                     },
                   ),
                 ),
-                // Suggestions dropdown
-                if (_suggestions.isNotEmpty && _addrFocus.hasFocus)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: _suggestions.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final s = _suggestions[index];
-                        return ListTile(
-                          leading: const Icon(Icons.place_outlined),
-                          title: Text(
-                            s['display_name'] as String,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                        // Suggestions dropdown
+                        if (_addrFocus.hasFocus && (_suggestions.isNotEmpty || _nearbyPlaces.isNotEmpty))
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Nearby places section
+                                if (_nearbyPlaces.isNotEmpty && _addrController.text.isEmpty)
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Text(
+                                          'Nearby Places',
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        itemCount: _nearbyPlaces.length,
+                                        separatorBuilder: (_, __) => const Divider(height: 1),
+                                        itemBuilder: (context, index) {
+                                          final place = _nearbyPlaces[index];
+                                          return ListTile(
+                                            leading: Icon(_getAmenityIcon(place['amenity'])),
+                                            title: Text(
+                                              place['name'] as String,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            subtitle: Text(
+                                              place['amenity'].toString().replaceAll('_', ' ').toUpperCase(),
+                                              style: Theme.of(context).textTheme.bodySmall,
+                                            ),
+                                            onTap: () {
+                                              setState(() {
+                                                _addresses.add(place['display_name'] as String);
+                                                _addrController.clear();
+                                                _addrFocus.unfocus();
+                                                _suggestions = [];
+                                                _nearbyPlaces = [];
+                                              });
+                                            },
+                                          );
+                                        },
+                                      ),
+                                      if (_suggestions.isNotEmpty) const Divider(),
+                                    ],
+                                  ),
+                                // Search suggestions section
+                                if (_suggestions.isNotEmpty)
+                                  ListView.separated(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: _suggestions.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final s = _suggestions[index];
+                                      return ListTile(
+                                        leading: const Icon(Icons.place_outlined),
+                                        title: Text(
+                                          s['display_name'] as String,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        onTap: () {
+                                          final display = s['display_name'] as String;
+                                          setState(() {
+                                            _addresses.add(display);
+                                            _addrController.clear();
+                                            _addrFocus.unfocus();
+                                            _suggestions = [];
+                                            _nearbyPlaces = [];
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                              ],
+                            ),
                           ),
-                          onTap: () {
-                            final display = s['display_name'] as String;
-                            setState(() {
-                              _addresses.add(display);
-                              _addrController.clear();
-                              _addrFocus.unfocus();
-                              _suggestions = [];
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
                 const SizedBox(height: 10),
                 // Material 3 Action buttons
                 Row(
@@ -936,7 +1205,7 @@ class _MyAppState extends State<MyApp> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         searchBarTheme: SearchBarThemeData(
-          shape: MaterialStateProperty.all(
+          shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           ),
         ),
@@ -964,7 +1233,7 @@ class _MyAppState extends State<MyApp> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         searchBarTheme: SearchBarThemeData(
-          shape: MaterialStateProperty.all(
+          shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           ),
         ),

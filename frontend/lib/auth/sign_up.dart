@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/db.dart';
-import '../services/email_service.dart';
+// Removed local DB/email demo in favor of backend auth
+// import '../services/db.dart';
+// import '../services/email_service.dart';
+import '../api_client.dart';
+import 'package:email_validator/email_validator.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -15,8 +18,31 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  final _api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
 
   Future<void> _signUp() async {
+    // Clear any prefilled values
+    _email.text = _email.text.trim();
+
+    // Email validation
+    if (!EmailValidator.validate(_email.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
+
+    // Strong password validation
+    final pwd = _password.text;
+    // final confirm = _confirmPassword.text; // not needed beyond equality check
+    final strong = _isStrongPassword(pwd);
+    if (!strong) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be 8+ chars with upper, lower, digit, special')),
+      );
+      return;
+    }
+
     if (_password.text != _confirmPassword.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Passwords do not match')),
@@ -24,49 +50,38 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
-    if (_password.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 6 characters')),
-      );
-      return;
-    }
+    // length already enforced via strong password
 
     setState(() => _loading = true);
     try {
-      final result = await DatabaseProvider.instance.createUser(
-        email: _email.text,
-        password: _password.text,
-      );
-      
-      if (!result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['error'] ?? 'User exists or error occurred')),
-        );
-        return;
-      }
-
-      // Send verification email
-      final emailSent = await EmailService.sendVerificationEmail(
-        email: _email.text,
-        verificationCode: result['verification_code'],
-      );
-
+      final res = await _api.register(email: _email.text, password: _password.text);
       if (!mounted) return;
-
-      if (emailSent) {
-        Navigator.pushReplacementNamed(
-          context, 
-          '/verify-email',
-          arguments: {'email': _email.text, 'code': result['verification_code']},
-        );
-      } else {
+      final msg = (res['message'] ?? '').toString().toLowerCase();
+      if (msg.contains('already exists') && msg.contains('verified')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created but email sending failed. Please try again.')),
+          const SnackBar(content: Text('Account already verified. Please sign in.')),
+        );
+        Navigator.pushReplacementNamed(context, '/signin');
+      } else {
+        Navigator.pushReplacementNamed(
+          context,
+          '/verify-email',
+          arguments: {'email': _email.text},
         );
       }
+    } on Exception catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  bool _isStrongPassword(String value) {
+    // At least 8 chars, 1 upper, 1 lower, 1 digit, 1 special (non-alphanumeric)
+    final regex = RegExp(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$");
+    return regex.hasMatch(value);
   }
 
   @override

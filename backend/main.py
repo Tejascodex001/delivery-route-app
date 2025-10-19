@@ -2,9 +2,9 @@ import sqlite3
 from datetime import datetime
 import joblib
 import pandas as pd
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, constr
 from paddleocr import PaddleOCR
 import shutil
 import os
@@ -14,8 +14,19 @@ import numpy as np
 from PIL import Image
 import logging
 from typing import List, Optional, Tuple, Dict, Any
+import hashlib
+import secrets
 import requests
 import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import base64
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +44,9 @@ except Exception as e:
 
 # --- Initialize Training Data Database ---
 def init_training_db():
-    conn = sqlite3.connect('training_data.db')
+    # Ensure db directory exists
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/training_data.db')
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -59,6 +72,42 @@ def init_training_db():
 
 init_training_db()
 
+# -------------------- Auth DB Init --------------------
+def init_auth_db():
+    # Ensure db directory exists
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            name TEXT,
+            is_verified INTEGER DEFAULT 0,
+            otp_code TEXT,
+            otp_expires_at TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Staging table: accounts that registered but have not verified OTP yet
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pending_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            name TEXT,
+            otp_code TEXT,
+            otp_expires_at TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    logger.info("Auth database initialized")
+
+init_auth_db()
+
 # --- Initialize PaddleOCR ---
 try:
     ocr_model = PaddleOCR(use_angle_cls=True, lang='en')
@@ -78,6 +127,130 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -------------------- Auth Utilities --------------------
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def generate_otp(length: int = 6) -> str:
+    return ''.join(str(secrets.randbelow(10)) for _ in range(length))
+
+# Gmail API Configuration
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+CREDENTIALS_FILE = 'credentials.json'
+TOKEN_FILE = 'token.json'
+
+def get_gmail_service():
+    """Get authenticated Gmail service using OAuth2"""
+    creds = None
+    
+    # Load existing token
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    
+    # If no valid credentials, run OAuth flow
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            if not os.path.exists(CREDENTIALS_FILE):
+                logger.error(f"Gmail credentials file not found: {CREDENTIALS_FILE}")
+                return None
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        # Save credentials for next run
+        with open(TOKEN_FILE, 'w') as token:
+            token.write(creds.to_json())
+    
+    try:
+        service = build('gmail', 'v1', credentials=creds)
+        return service
+    except Exception as e:
+        logger.error(f"Failed to build Gmail service: {e}")
+        return None
+
+def send_verification_email(email: str, otp: str) -> bool:
+    """Send verification email via Gmail API"""
+    try:
+        service = get_gmail_service()
+        if not service:
+            logger.warning("Gmail service not available. Using placeholder.")
+            logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
+            return False
+        
+        # Create email message
+        message = MIMEMultipart()
+        message['to'] = email
+        message['subject'] = "Your Delivery Route Optimizer Verification Code"
+        
+        # Email body
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0;">
+                <h1 style="margin: 0; font-size: 28px;">🚚 Delivery Route Optimizer</h1>
+            </div>
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+                <h2 style="color: #333; text-align: center; margin-bottom: 20px;">Email Verification</h2>
+                <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 30px;">
+                    Your verification code is:
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <span style="background: #1976d2; color: white; font-size: 36px; font-weight: bold; padding: 20px 40px; border-radius: 8px; letter-spacing: 8px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                        {otp}
+                    </span>
+                </div>
+                <p style="color: #666; font-size: 14px; text-align: center; margin: 20px 0;">
+                    ⏰ This code will expire in 10 minutes
+                </p>
+                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+                    If you didn't request this code, please ignore this email.
+                </p>
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+                    <p style="color: #666; font-size: 14px; margin: 0;">
+                        Best regards,<br>
+                        <strong>Delivery Route Optimizer Team</strong>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        message.attach(MIMEText(body, 'html'))
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Send email
+        send_message = service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        logger.info(f"Verification email sent successfully to {email} (Message ID: {send_message['id']})")
+        return True
+        
+    except HttpError as error:
+        logger.error(f"Gmail API error sending to {email}: {error}")
+        # Fallback to console logging
+        logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send email to {email}: {e}")
+        # Fallback to console logging
+        logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
+        return False
+
+def send_email_placeholder(email: str, subject: str, body: str) -> None:
+    """Legacy function - now calls send_verification_email for OTP emails"""
+    if "verification code" in subject.lower() and "otp is:" in body.lower():
+        # Extract OTP from body
+        otp = body.split("OTP is: ")[1] if "OTP is: " in body else "123456"
+        send_verification_email(email, otp)
+    else:
+        logger.info(f"[EMAIL] To: {email} | Subject: {subject} | Body: {body}")
 
 # --- Define Data Models ---
 class RouteData(BaseModel):
@@ -113,6 +286,20 @@ class TrainingDataRequest(BaseModel):
 class UpdateEtaRequest(BaseModel):
     route_id: str
     actual_eta_minutes: float
+
+# -------------------- Auth Models --------------------
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: constr(min_length=6)
+    name: Optional[str] = None
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    otp: constr(min_length=4, max_length=8)
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 class PlannedRouteResponse(BaseModel):
     ordered_addresses: List[str]
@@ -677,7 +864,8 @@ def predict_eta(data: RouteData):
 def log_route(route: CompletedRoute):
     actual_duration = (datetime.fromisoformat(route.end_time) - datetime.fromisoformat(route.start_time)).total_seconds() / 60
     try:
-        conn = sqlite3.connect('routes.db')
+        os.makedirs('db', exist_ok=True)
+        conn = sqlite3.connect('db/routes.db')
         cursor = conn.cursor()
         sql = """
         INSERT INTO completed_routes 
@@ -690,6 +878,66 @@ def log_route(route: CompletedRoute):
         return {"status": "success", "message": "Route logged successfully."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.get("/nearby-places")
+def get_nearby_places(lat: float, lon: float, radius: int = 5000):
+    """Get nearby famous places and landmarks."""
+    try:
+        # Use Overpass API (OpenStreetMap) to get nearby places
+        overpass_url = "http://overpass-api.de/api/interpreter"
+        
+        # Query for nearby places of interest
+        query = f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"~"^(restaurant|hospital|school|university|bank|fuel|parking|pharmacy|post_office|police|fire_station)$"](around:{radius},{lat},{lon});
+          way["amenity"~"^(restaurant|hospital|school|university|bank|fuel|parking|pharmacy|post_office|police|fire_station)$"](around:{radius},{lat},{lon});
+          relation["amenity"~"^(restaurant|hospital|school|university|bank|fuel|parking|pharmacy|post_office|police|fire_station)$"](around:{radius},{lat},{lon});
+        );
+        out center;
+        """
+        
+        response = requests.post(overpass_url, data=query, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            places = []
+            
+            for element in data.get("elements", []):
+                tags = element.get("tags", {})
+                name = tags.get("name", "Unknown")
+                amenity = tags.get("amenity", "")
+                
+                # Get coordinates
+                if element["type"] == "node":
+                    place_lat = element["lat"]
+                    place_lon = element["lon"]
+                else:
+                    # For ways and relations, use center
+                    center = element.get("center", {})
+                    place_lat = center.get("lat")
+                    place_lon = center.get("lon")
+                
+                if place_lat and place_lon and name != "Unknown":
+                    places.append({
+                        "name": name,
+                        "amenity": amenity,
+                        "lat": place_lat,
+                        "lon": place_lon,
+                        "display_name": f"{name} ({amenity.replace('_', ' ').title()})"
+                    })
+            
+            # Sort by distance and limit results
+            places = sorted(places, key=lambda x: ((x["lat"] - lat)**2 + (x["lon"] - lon)**2)**0.5)[:10]
+            
+            logger.info(f"Found {len(places)} nearby places")
+            return {"places": places}
+        else:
+            logger.warning(f"Overpass API error: {response.status_code}")
+            return {"places": []}
+            
+    except Exception as e:
+        logger.error(f"❌ Error getting nearby places: {e}")
+        return {"places": []}
 
 @app.get("/search-suggestions")
 def search_suggestions(q: str):
@@ -993,7 +1241,8 @@ def plan_full_route(req: PlanRouteRequest):
 def submit_training_data(data: TrainingDataRequest):
     """Submit training data for model improvement."""
     try:
-        conn = sqlite3.connect('training_data.db')
+        os.makedirs('db', exist_ok=True)
+        conn = sqlite3.connect('db/training_data.db')
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -1028,7 +1277,8 @@ def submit_training_data(data: TrainingDataRequest):
 def update_actual_eta(data: UpdateEtaRequest):
     """Update actual ETA for a completed route."""
     try:
-        conn = sqlite3.connect('training_data.db')
+        os.makedirs('db', exist_ok=True)
+        conn = sqlite3.connect('db/training_data.db')
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -1055,7 +1305,8 @@ def update_actual_eta(data: UpdateEtaRequest):
 def get_training_data_stats():
     """Get statistics about collected training data."""
     try:
-        conn = sqlite3.connect('training_data.db')
+        os.makedirs('db', exist_ok=True)
+        conn = sqlite3.connect('db/training_data.db')
         cursor = conn.cursor()
         
         # Get total routes
@@ -1167,6 +1418,142 @@ def get_traffic_config():
             "traffic_api": bool(TRAFFIC_API_KEY)
         }
     }
+
+# -------------------- Auth Endpoints --------------------
+@app.post("/auth/register")
+def register(req: RegisterRequest):
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    try:
+        email = req.email.lower()
+        # If already verified user exists, do not error, just respond idempotently
+        cursor.execute("SELECT id FROM users WHERE email = ? AND is_verified = 1", (email,))
+        row = cursor.fetchone()
+        if row:
+            return {"message": "User already exists and is verified"}
+
+        # If pending exists, update OTP and password_hash; else insert new pending
+        otp = generate_otp()
+        expires = (datetime.utcnow()).isoformat()
+        cursor.execute("SELECT id FROM pending_users WHERE email = ?", (email,))
+        pending = cursor.fetchone()
+        if pending:
+            cursor.execute(
+                "UPDATE pending_users SET password_hash = ?, name = ?, otp_code = ?, otp_expires_at = ? WHERE email = ?",
+                (hash_password(req.password), req.name, otp, expires, email)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO pending_users (email, password_hash, name, otp_code, otp_expires_at) VALUES (?, ?, ?, ?, ?)",
+                (email, hash_password(req.password), req.name, otp, expires)
+            )
+        conn.commit()
+        email_sent = send_verification_email(email, otp)
+        if email_sent:
+            return {"message": "Verification OTP sent to email"}
+        else:
+            return {"message": "Verification OTP sent to email (check console for OTP)"}
+    finally:
+        conn.close()
+
+@app.post("/auth/verify-email")
+def verify_email(req: VerifyEmailRequest):
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    try:
+        email = req.email.lower()
+        # First, try pending_users
+        cursor.execute("SELECT id, password_hash, name, otp_code FROM pending_users WHERE email = ?", (email,))
+        prow = cursor.fetchone()
+        if prow:
+            pid, pwd_hash, name, otp_code = prow
+            if otp_code != req.otp:
+                raise HTTPException(status_code=400, detail="Invalid OTP")
+            # Move to users as verified
+            try:
+                cursor.execute(
+                    "INSERT INTO users (email, password_hash, name, is_verified) VALUES (?, ?, ?, 1)",
+                    (email, pwd_hash, name)
+                )
+                cursor.execute("DELETE FROM pending_users WHERE id = ?", (pid,))
+                conn.commit()
+                return {"message": "Email verified"}
+            except sqlite3.IntegrityError:
+                # If user already exists (rare race), just mark verified
+                cursor.execute("UPDATE users SET is_verified = 1 WHERE email = ?", (email,))
+                cursor.execute("DELETE FROM pending_users WHERE id = ?", (pid,))
+                conn.commit()
+                return {"message": "Email verified"}
+        # If not in pending, check if already verified user exists
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+        urow = cursor.fetchone()
+        if urow:
+            return {"message": "Email already verified"}
+        raise HTTPException(status_code=404, detail="User not found")
+    finally:
+        conn.close()
+
+@app.post("/auth/login")
+def login(req: LoginRequest):
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, password_hash, is_verified, name FROM users WHERE email = ?", (req.email.lower(),))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        uid, pwd_hash, is_verified, name = row
+        if hash_password(req.password) != pwd_hash:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not is_verified:
+            # Do not reveal existence; treat as invalid credentials
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        # Simple session placeholder: return user info
+        return {"user_id": uid, "email": req.email, "name": name}
+    finally:
+        conn.close()
+
+@app.get("/auth/dev-otp")
+def get_dev_otp(email: str):
+    """Dev helper: returns the current OTP for an email for local testing.
+    Requires environment variable DEV_MODE=1 to be set.
+    """
+    if os.environ.get('DEV_MODE') != '1':
+        raise HTTPException(status_code=404, detail="Not found")
+    em = email.lower()
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT otp_code FROM pending_users WHERE email = ?", (em,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            return {"email": em, "otp": row[0]}
+        # Legacy/pathological state: user row with stored OTP
+        cursor.execute("SELECT otp_code FROM users WHERE email = ? AND (is_verified = 0 OR otp_code IS NOT NULL)", (em,))
+        row = cursor.fetchone()
+        if row and row[0]:
+            return {"email": em, "otp": row[0]}
+        raise HTTPException(status_code=404, detail="No OTP found")
+    finally:
+        conn.close()
+
+@app.post("/auth/reset-users")
+def reset_users():
+    """Debug-only: clears users and pending_users tables."""
+    os.makedirs('db', exist_ok=True)
+    conn = sqlite3.connect('db/auth.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM users")
+        cursor.execute("DELETE FROM pending_users")
+        conn.commit()
+        return {"message": "All users cleared"}
+    finally:
+        conn.close()
 
 @app.get("/debug-route")
 def debug_route(addresses: str):

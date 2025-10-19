@@ -52,6 +52,66 @@ class ApiClient {
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
   }
+
+  Future<List<Map<String, dynamic>>> getNearbyPlaces(double lat, double lon, {int radius = 5000}) async {
+    final uri = Uri.parse('$baseUrl/nearby-places').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lon': lon.toString(),
+      'radius': radius.toString(),
+    });
+    final resp = await http.get(uri);
+    if (resp.statusCode != 200) {
+      throw Exception('Nearby places error: ${resp.statusCode} ${resp.body}');
+    }
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    return List<Map<String, dynamic>>.from(data['places'] ?? []);
+  }
+
+  // -------- Auth --------
+  Future<Map<String, dynamic>> register({required String email, required String password, String? name}) async {
+    final uri = Uri.parse('$baseUrl/auth/register');
+    final resp = await http.post(uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password, 'name': name}));
+    final body = resp.body.isEmpty ? '{}' : resp.body;
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    if (resp.statusCode == 409) {
+      throw Exception('User already exists');
+    }
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(data['detail'] ?? 'Registration failed');
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> verifyEmail({required String email, required String otp}) async {
+    final uri = Uri.parse('$baseUrl/auth/verify-email');
+    final resp = await http.post(uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'otp': otp}));
+    final body = resp.body.isEmpty ? '{}' : resp.body;
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(data['detail'] ?? 'Verification failed');
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> login({required String email, required String password}) async {
+    final uri = Uri.parse('$baseUrl/auth/login');
+    final resp = await http.post(uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}));
+    final body = resp.body.isEmpty ? '{}' : resp.body;
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    if (resp.statusCode == 403) {
+      throw Exception('Email not verified');
+    }
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(data['detail'] ?? 'Invalid credentials');
+    }
+    return data;
+  }
 }
 
 

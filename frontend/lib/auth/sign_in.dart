@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/db.dart';
+import '../api_client.dart';
+import 'package:email_validator/email_validator.dart';
 import '../services/location_service.dart';
 import '../main.dart';
 
@@ -15,32 +17,29 @@ class _SignInPageState extends State<SignInPage> {
   final _password = TextEditingController();
   bool _loading = false;
   bool _obscurePassword = true;
+  final _api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
 
   Future<void> _signIn() async {
+    // Clear any prefilled spaces
+    _email.text = _email.text.trim();
+    if (!EmailValidator.validate(_email.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
-      final result = await DatabaseProvider.instance.validateUser(
-        email: _email.text,
-        password: _password.text,
-      );
+      final result = await _api.login(email: _email.text, password: _password.text);
       
-      if (!result['success']) {
-        if (result['needs_verification'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please verify your email first')),
-          );
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['error'] ?? 'Invalid credentials')),
-        );
-        return;
-      }
+      if (!mounted) return;
 
       // Save session
       await DatabaseProvider.instance.saveSession(
         email: _email.text,
-        userId: result['user_id'],
+        userId: (result['user_id'] is int)
+            ? result['user_id'] as int
+            : int.tryParse('${result['user_id']}') ?? 0,
       );
 
       // Check location permission
@@ -65,6 +64,12 @@ class _SignInPageState extends State<SignInPage> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MapScreen()),
+      );
+    } on Exception catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      // Always show a generic error; do not auto-route to verification on login
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg.isEmpty ? 'Login failed' : msg)),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
