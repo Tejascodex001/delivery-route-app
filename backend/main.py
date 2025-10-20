@@ -28,6 +28,20 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# Load environment variables from .env file
+def load_env_file():
+    """Load environment variables from .env file if it exists"""
+    env_file = '.env'
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key] = value
+
+load_env_file()
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -171,75 +185,80 @@ def get_gmail_service():
         return None
 
 def send_verification_email(email: str, otp: str) -> bool:
-    """Send verification email via Gmail API"""
+    """Send verification email via Gmail SMTP (app password). Falls back to OAuth if configured."""
+    # Build HTML body once
+    body_html = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 28px;">🚚 Delivery Route Optimizer</h1>
+        </div>
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <h2 style="color: #333; text-align: center; margin-bottom: 20px;">Email Verification</h2>
+            <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 30px;">
+                Your verification code is:
+            </p>
+            <div style="text-align: center; margin: 30px 0;">
+                <span style="background: #1976d2; color: white; font-size: 36px; font-weight: bold; padding: 20px 40px; border-radius: 8px; letter-spacing: 8px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    {otp}
+                </span>
+            </div>
+            <p style="color: #666; font-size: 14px; text-align: center; margin: 20px 0;">
+                ⏰ This code will expire in 10 minutes
+            </p>
+            <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
+                If you didn't request this code, please ignore this email.
+            </p>
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+                <p style="color: #666; font-size: 14px; margin: 0;">
+                    Best regards,<br>
+                    <strong>Delivery Route Optimizer Team</strong>
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    # Try SMTP first if env vars present
+    gmail_user = os.environ.get("GMAIL_USER")
+    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    if gmail_user and gmail_app_password:
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = "Your Delivery Route Optimizer Verification Code"
+            msg['From'] = gmail_user
+            msg['To'] = email
+            msg.attach(MIMEText(body_html, 'html'))
+
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+                smtp.login(gmail_user, gmail_app_password)
+                smtp.sendmail(gmail_user, [email], msg.as_string())
+
+            logger.info(f"Verification email sent via SMTP to {email}")
+            return True
+        except Exception as e:
+            logger.error(f"SMTP send failed, will try Gmail API fallback: {e}")
+            # Fall through to OAuth fallback below
+
+    # Fallback to Gmail API OAuth if configured
     try:
         service = get_gmail_service()
         if not service:
-            logger.warning("Gmail service not available. Using placeholder.")
+            logger.warning("No email transport available. Logging OTP to console.")
             logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
             return False
-        
-        # Create email message
+
         message = MIMEMultipart()
         message['to'] = email
         message['subject'] = "Your Delivery Route Optimizer Verification Code"
-        
-        # Email body
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0;">
-                <h1 style="margin: 0; font-size: 28px;">🚚 Delivery Route Optimizer</h1>
-            </div>
-            <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
-                <h2 style="color: #333; text-align: center; margin-bottom: 20px;">Email Verification</h2>
-                <p style="color: #666; font-size: 16px; text-align: center; margin-bottom: 30px;">
-                    Your verification code is:
-                </p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <span style="background: #1976d2; color: white; font-size: 36px; font-weight: bold; padding: 20px 40px; border-radius: 8px; letter-spacing: 8px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                        {otp}
-                    </span>
-                </div>
-                <p style="color: #666; font-size: 14px; text-align: center; margin: 20px 0;">
-                    ⏰ This code will expire in 10 minutes
-                </p>
-                <p style="color: #999; font-size: 12px; text-align: center; margin-top: 30px;">
-                    If you didn't request this code, please ignore this email.
-                </p>
-                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
-                    <p style="color: #666; font-size: 14px; margin: 0;">
-                        Best regards,<br>
-                        <strong>Delivery Route Optimizer Team</strong>
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        message.attach(MIMEText(body, 'html'))
-        
-        # Encode message
+        message.attach(MIMEText(body_html, 'html'))
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        
-        # Send email
-        send_message = service.users().messages().send(
-            userId='me',
-            body={'raw': raw_message}
-        ).execute()
-        
-        logger.info(f"Verification email sent successfully to {email} (Message ID: {send_message['id']})")
+        send_message = service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
+        logger.info(f"Verification email sent via Gmail API to {email} (Message ID: {send_message['id']})")
         return True
-        
-    except HttpError as error:
-        logger.error(f"Gmail API error sending to {email}: {error}")
-        # Fallback to console logging
-        logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
-        return False
     except Exception as e:
-        logger.error(f"Failed to send email to {email}: {e}")
-        # Fallback to console logging
+        logger.error(f"Gmail API send failed. Logging OTP to console. Error: {e}")
         logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
         return False
 
