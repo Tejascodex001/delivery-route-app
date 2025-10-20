@@ -569,24 +569,10 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.route,
-                color: Theme.of(context).colorScheme.onPrimary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text('RouteOptimizer'),
-          ],
-        ),
+        title: const Text('RouteOptimizer'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
       ),
       drawer: Drawer(
         child: SafeArea(
@@ -805,10 +791,11 @@ class _MapScreenState extends State<MapScreen> {
                     },
                   ),
                 ),
-                        // Suggestions dropdown
+                        // Suggestions dropdown with scrolling
                         if (_addrFocus.hasFocus && (_suggestions.isNotEmpty || _nearbyPlaces.isNotEmpty))
                           Container(
                             margin: const EdgeInsets.only(top: 8),
+                            constraints: const BoxConstraints(maxHeight: 300), // Limit height for scrolling
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -820,99 +807,97 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ],
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Nearby places section
-                                if (_nearbyPlaces.isNotEmpty && _addrController.text.isEmpty)
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Text(
-                                          'Nearby Places',
-                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.primary,
-                                            fontWeight: FontWeight.bold,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Nearby places section
+                                  if (_nearbyPlaces.isNotEmpty && _addrController.text.isEmpty)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Text(
+                                            'Nearby Places',
+                                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      ListView.separated(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        itemCount: _nearbyPlaces.length,
-                                        separatorBuilder: (_, __) => const Divider(height: 1),
-                                        itemBuilder: (context, index) {
-                                          final place = _nearbyPlaces[index];
-                                          return ListTile(
-                                            leading: Icon(_getAmenityIcon(place['amenity'])),
-                                            title: Text(
-                                              place['name'] as String,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            subtitle: Text(
-                                              place['amenity'].toString().replaceAll('_', ' ').toUpperCase(),
-                                              style: Theme.of(context).textTheme.bodySmall,
-                                            ),
-                                            onTap: () {
-                                              setState(() {
-                                                _addresses.add(place['display_name'] as String);
-                                                _addrController.clear();
-                                                _addrFocus.unfocus();
-                                                _suggestions = [];
-                                                _nearbyPlaces = [];
-                                              });
-                                            },
-                                          );
-                                        },
-                                      ),
-                                      if (_suggestions.isNotEmpty) const Divider(),
-                                    ],
-                                  ),
-                                // Search suggestions section
-                                if (_suggestions.isNotEmpty)
-                                  ListView.separated(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _suggestions.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      final s = _suggestions[index];
-                                      return ListTile(
-                                        leading: const Icon(Icons.place_outlined),
-                                        title: Text(
-                                          s['display_name'] as String,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                        ListView.separated(
+                                          shrinkWrap: true,
+                                          physics: const NeverScrollableScrollPhysics(),
+                                          itemCount: _nearbyPlaces.length,
+                                          separatorBuilder: (_, __) => const Divider(height: 1),
+                                          itemBuilder: (context, index) {
+                                            final place = _nearbyPlaces[index];
+                                            return ListTile(
+                                              leading: Icon(_getAmenityIcon(place['amenity'])),
+                                              title: Text(
+                                                place['name'] as String,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              subtitle: Text(
+                                                place['amenity'].toString().replaceAll('_', ' ').toUpperCase(),
+                                                style: Theme.of(context).textTheme.bodySmall,
+                                              ),
+                                              onTap: () {
+                                                setState(() {
+                                                  _addresses.add(place['display_name'] as String);
+                                                  _addrController.clear();
+                                                  _addrFocus.unfocus();
+                                                  _suggestions = [];
+                                                  _nearbyPlaces = [];
+                                                });
+                                              },
+                                            );
+                                          },
                                         ),
-                                        onTap: () {
-                                          final display = s['display_name'] as String;
-                                          setState(() {
-                                            _addresses.add(display);
-                                            _addrController.clear();
-                                            _addrFocus.unfocus();
-                                            _suggestions = [];
-                                            _nearbyPlaces = [];
-                                          });
-                                        },
-                                      );
-                                    },
-                                  ),
-                              ],
+                                        if (_suggestions.isNotEmpty) const Divider(),
+                                      ],
+                                    ),
+                                  // Search suggestions section
+                                  if (_suggestions.isNotEmpty)
+                                    ListView.separated(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      itemCount: _suggestions.length,
+                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      itemBuilder: (context, index) {
+                                        final s = _suggestions[index];
+                                        return ListTile(
+                                          leading: const Icon(Icons.place_outlined),
+                                          title: Text(
+                                            s['display_name'] as String,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          onTap: () {
+                                            final display = s['display_name'] as String;
+                                            setState(() {
+                                              _addresses.add(display);
+                                              _addrController.clear();
+                                              _addrFocus.unfocus();
+                                              _suggestions = [];
+                                              _nearbyPlaces = [];
+                                            });
+                                          },
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                 const SizedBox(height: 10),
-                // Material 3 Action buttons
+                // Modern Action buttons with consistent sizing
                 Row(
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        ),
                         onPressed: _isLoading
                             ? null
                             : () async {
@@ -928,16 +913,24 @@ class _MapScreenState extends State<MapScreen> {
                         icon: _isLoading
                             ? const SizedBox(
                                 width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.alt_route),
-                        label: const Text('Plan Route'),
+                            : const Icon(Icons.alt_route, size: 18),
+                        label: const Text('Plan'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _addresses.isEmpty ? null : _saveCurrentRoute,
-                        icon: const Icon(Icons.bookmark_add),
+                        icon: const Icon(Icons.bookmark_add, size: 18),
                         label: const Text('Save'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -949,8 +942,12 @@ class _MapScreenState extends State<MapScreen> {
                           });
                           _clearCurrentRoute();
                         },
-                        icon: const Icon(Icons.clear_all),
+                        icon: const Icon(Icons.clear_all, size: 18),
                         label: const Text('Clear'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ],
@@ -997,13 +994,13 @@ class _MapScreenState extends State<MapScreen> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           avatar: CircleAvatar(
-                            radius: 8,
+                            radius: 10,
                             backgroundColor: chipColor,
                             child: Text(
                               '$displayNumber',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1014,6 +1011,8 @@ class _MapScreenState extends State<MapScreen> {
                             });
                             _clearCurrentRoute();
                           },
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         );
                       },
                     ),
@@ -1092,35 +1091,43 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     if (_ordered.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _openExternalNav,
-                              icon: const Icon(Icons.navigation),
-                              label: const Text('Start Navigation'),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: _openExternalNav,
+                                icon: const Icon(Icons.navigation, size: 18),
+                                label: const Text('Start Navigation'),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                // Clear current route but keep addresses for adding more
-                                setState(() {
-                                  _ordered = [];
-                                  _polyline = [];
-                                  _orderedAddresses = [];
-                                  _predictedEtaMinutes = null;
-                                });
-                                _currentRouteId = null;
-                                _routeStartTime = null;
-                              },
-                              icon: const Icon(Icons.add_location),
-                              label: const Text('Add More'),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  // Clear current route but keep addresses for adding more
+                                  setState(() {
+                                    _ordered = [];
+                                    _polyline = [];
+                                    _orderedAddresses = [];
+                                    _predictedEtaMinutes = null;
+                                  });
+                                  _currentRouteId = null;
+                                  _routeStartTime = null;
+                                },
+                                icon: const Icon(Icons.add_location, size: 18),
+                                label: const Text('Add More'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ],
                 ),
@@ -1136,8 +1143,12 @@ class _MapScreenState extends State<MapScreen> {
               child: SafeArea(
                 child: FilledButton.icon(
                   onPressed: _ordered.length >= 2 ? _openExternalNav : null,
-                  icon: const Icon(Icons.navigation),
+                  icon: const Icon(Icons.navigation, size: 18),
                   label: const Text('Start Navigation'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
             ),
@@ -1181,61 +1192,71 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       themeMode: _mode,
       theme: ThemeData(
-        colorSchemeSeed: Colors.blue,
-        brightness: Brightness.light,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        // Material You components
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
+        appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(0, 44),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(0, 44),
           ),
         ),
-        chipTheme: ChipThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey.withOpacity(0.06),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         ),
+        chipTheme: ChipThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
         searchBarTheme: SearchBarThemeData(
-          shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          ),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(28))),
         ),
       ),
       darkTheme: ThemeData(
-        colorSchemeSeed: Colors.cyan,
-        brightness: Brightness.dark,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        // Material You components
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.cyan, brightness: Brightness.dark),
+        appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(0, 44),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size(0, 44),
           ),
         ),
-        chipTheme: ChipThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         ),
+        chipTheme: ChipThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
         searchBarTheme: SearchBarThemeData(
-          shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          ),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(28))),
         ),
       ),
       routes: {
@@ -1442,3 +1463,4 @@ class SavedRoutesPage extends StatelessWidget {
     );
   }
 }
+

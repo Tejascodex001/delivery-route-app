@@ -369,25 +369,49 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
                 "api_key": ORS_API_KEY,
                 "text": address,
                 "boundary.country": "IN",  # Focus on India
-                "size": 5  # Get more results to find better matches
+                "size": 10,  # Get more results to find better matches
+                "layers": "address,poi,street,locality,neighbourhood",  # More specific layers
+                "sources": "osm,oa,wof,gn"  # Multiple data sources
             }
             logger.info(f"🔍 ORS geocoding request for '{address}' with key: {ORS_API_KEY[:20]}...")
             resp = requests.get(url, params=params, headers=headers, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("features"):
-                    # Try to find the most specific match
+                    # Try to find the most specific match with better scoring
                     best_feature = None
+                    best_score = 0
+                    
                     for feature in data["features"]:
                         props = feature.get("properties", {})
                         confidence = props.get("confidence", 0)
                         layer = props.get("layer", "")
+                        name = props.get("name", "").lower()
+                        label = props.get("label", "").lower()
                         
-                        # Prefer address layer for specific addresses
-                        if layer == "address" and confidence > 0.7:
-                            best_feature = feature
-                            break
-                        elif not best_feature and confidence > 0.5:
+                        # Calculate score based on multiple factors
+                        score = confidence
+                        
+                        # Boost score for exact name matches
+                        if address.lower() in name or address.lower() in label:
+                            score += 0.3
+                        
+                        # Boost score for specific layers
+                        if layer == "address":
+                            score += 0.2
+                        elif layer == "poi":
+                            score += 0.15
+                        elif layer == "street":
+                            score += 0.1
+                        
+                        # Boost score for higher confidence
+                        if confidence > 0.8:
+                            score += 0.2
+                        elif confidence > 0.6:
+                            score += 0.1
+                        
+                        if score > best_score:
+                            best_score = score
                             best_feature = feature
                     
                     if not best_feature:
@@ -1136,7 +1160,7 @@ def plan_full_route(req: PlanRouteRequest):
                 segment_distance = float(summary.get("distance", 0.0))
                 segment_duration = float(summary.get("duration", 0.0)) / 60.0  # Convert to minutes
                 
-                # Apply dynamic traffic multiplier based on location and time
+                # Apply more accurate traffic multiplier based on location and time
                 # Get the midpoint of the segment for traffic calculation
                 mid_lat = (start_coord[0] + end_coord[0]) / 2
                 mid_lon = (start_coord[1] + end_coord[1]) / 2
@@ -1148,10 +1172,20 @@ def plan_full_route(req: PlanRouteRequest):
                     traffic_multiplier = real_time_traffic.get('multiplier', 1.8)
                     logger.info(f"    Using real-time traffic multiplier: {traffic_multiplier:.2f}")
                 else:
-                    # Fallback to time and location-based multiplier
+                    # Use improved traffic calculation
                     traffic_multiplier = get_traffic_multiplier(mid_lat, mid_lon)
+                    
+                    # Additional adjustment based on distance (longer routes have more variability)
+                    if segment_distance > 10:  # Long distance
+                        traffic_multiplier *= 1.1
+                    elif segment_distance < 2:  # Short distance
+                        traffic_multiplier *= 0.9
                 
+                # Apply traffic multiplier with some smoothing
                 segment_duration *= traffic_multiplier
+                
+                # Add small buffer for real-world conditions (parking, traffic lights, etc.)
+                segment_duration += 1.0  # 1 minute buffer per segment
                 
                 total_segment_duration += segment_duration
                 total_segment_distance += segment_distance
@@ -1174,7 +1208,7 @@ def plan_full_route(req: PlanRouteRequest):
                 logger.warning(f"  Failed to get directions for segment {i+1}")
         
         # Add delivery time at each stop (except the last one)
-        delivery_time_per_stop = 2.0  # 2 minutes per stop for delivery
+        delivery_time_per_stop = 3.0  # 3 minutes per stop for delivery (more realistic)
         total_delivery_time = (num_stops - 1) * delivery_time_per_stop
         
         # This is a linear delivery route (not round trip)
