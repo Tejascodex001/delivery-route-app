@@ -6,8 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:csv/csv.dart';
 import 'api_client.dart';
 import 'auth/sign_in.dart';
 import 'auth/sign_up.dart';
@@ -52,12 +52,13 @@ class _MapScreenState extends State<MapScreen> {
   DateTime? _routeStartTime;
   double? _predictedEtaMinutes;
 
-  // Local saved routes (simple in-memory). Each item is a list of addresses.
-  final List<List<String>> _savedRoutes = [];
+  // Local saved routes with detailed information
+  final List<Map<String, dynamic>> _savedRoutes = [];
 
   @override
   void initState() {
     super.initState();
+    _loadSavedRoutesFromCSV(); // Load saved routes from CSV
     _addrFocus.addListener(() {
       if (_addrFocus.hasFocus) {
         // Load nearby places when search bar gains focus
@@ -108,12 +109,197 @@ class _MapScreenState extends State<MapScreen> {
 
   void _saveCurrentRoute() {
     if (_addresses.isEmpty) return;
-    setState(() {
-      _savedRoutes.add(List<String>.from(_addresses));
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Route saved')),
+    _showSaveRouteDialog();
+  }
+
+  void _showSaveRouteDialog() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.save_alt, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Save Route'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Route Name',
+                hintText: 'e.g., Daily Delivery Route',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Add notes about this route...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Route Summary',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text('${_addresses.length} stops'),
+                  if (_predictedEtaMinutes != null)
+                    Text('ETA: ${_predictedEtaMinutes!.toStringAsFixed(0)} minutes'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a route name')),
+                );
+                return;
+              }
+              _saveRouteWithDetails(
+                nameController.text.trim(),
+                descriptionController.text.trim(),
+              );
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.save),
+            label: const Text('Save Route'),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _saveRouteWithDetails(String name, String description) {
+    final routeData = {
+      'name': name,
+      'description': description,
+      'addresses': List<String>.from(_addresses),
+      'eta': _predictedEtaMinutes,
+      'timestamp': DateTime.now().toIso8601String(),
+      'coordinates': _ordered.map((coord) => {'lat': coord.latitude, 'lng': coord.longitude}).toList(),
+    };
+    
+    setState(() {
+      _savedRoutes.add(routeData);
+    });
+    
+    // Save to CSV file
+    _saveRouteToCSV(routeData);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Route "$name" saved successfully!'),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () => _openSavedRoutesPage(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveRouteToCSV(Map<String, dynamic> routeData) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/saved_routes.csv');
+      
+      List<List<dynamic>> csvData = [];
+      
+      // If file exists, read existing data
+      if (await file.exists()) {
+        final existingContent = await file.readAsString();
+        csvData = const CsvToListConverter().convert(existingContent);
+      } else {
+        // Add header row for new file
+        csvData.add(['Name', 'Description', 'Addresses', 'ETA (minutes)', 'Timestamp', 'Coordinates']);
+      }
+      
+      // Add new route data
+      csvData.add([
+        routeData['name'],
+        routeData['description'],
+        (routeData['addresses'] as List).join('; '),
+        routeData['eta']?.toString() ?? '',
+        routeData['timestamp'],
+        (routeData['coordinates'] as List).map((coord) => '${coord['lat']},${coord['lng']}').join('; '),
+      ]);
+      
+      // Write to file
+      final csvString = const ListToCsvConverter().convert(csvData);
+      await file.writeAsString(csvString);
+      
+      print('Route saved to CSV: ${file.path}');
+    } catch (e) {
+      print('Error saving route to CSV: $e');
+    }
+  }
+
+  Future<void> _loadSavedRoutesFromCSV() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/saved_routes.csv');
+      
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final csvData = const CsvToListConverter().convert(content);
+        
+        setState(() {
+          _savedRoutes.clear();
+          // Skip header row
+          for (int i = 1; i < csvData.length; i++) {
+            final row = csvData[i];
+            if (row.length >= 6) {
+              _savedRoutes.add({
+                'name': row[0],
+                'description': row[1],
+                'addresses': (row[2] as String).split('; '),
+                'eta': double.tryParse(row[3].toString()),
+                'timestamp': row[4],
+                'coordinates': (row[5] as String).split('; ').map((coord) {
+                  final parts = coord.split(',');
+                  if (parts.length == 2) {
+                    return {
+                      'lat': double.tryParse(parts[0]) ?? 0.0,
+                      'lng': double.tryParse(parts[1]) ?? 0.0,
+                    };
+                  }
+                  return {'lat': 0.0, 'lng': 0.0};
+                }).toList(),
+              });
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading saved routes from CSV: $e');
+    }
   }
 
   Future<void> _logout() async {
@@ -635,7 +821,7 @@ class _MapScreenState extends State<MapScreen> {
                 initialZoom: 11,
               ),
               children: [
-                // High-contrast tiles with POIs and labels; force light @2x for readability
+                // Default light theme tiles for reliability
                 TileLayer(
                   urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
                   subdomains: const ['a', 'b', 'c', 'd'],
@@ -643,9 +829,21 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 PolylineLayer(polylines: [
                   if (_polyline.isNotEmpty)
-                    Polyline(points: _polyline, color: Colors.black.withValues(alpha: 0.25), strokeWidth: 9),
+                    Polyline(
+                      points: _polyline, 
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.white.withValues(alpha: 0.3) 
+                          : Colors.black.withValues(alpha: 0.25), 
+                      strokeWidth: 9
+                    ),
                   if (_polyline.isNotEmpty)
-                    Polyline(points: _polyline, color: Theme.of(context).colorScheme.primary, strokeWidth: 6),
+                    Polyline(
+                      points: _polyline, 
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.cyan 
+                          : Theme.of(context).colorScheme.primary, 
+                      strokeWidth: 6
+                    ),
                 ]),
                 MarkerLayer(markers: [
                   // Current location marker (Google Maps style)
@@ -1158,6 +1356,278 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
+class PreferencesScreen extends StatefulWidget {
+  const PreferencesScreen({super.key});
+
+  @override
+  State<PreferencesScreen> createState() => _PreferencesScreenState();
+}
+
+class _PreferencesScreenState extends State<PreferencesScreen> {
+  bool _isDarkTheme = false;
+  bool _dataCollectionEnabled = false;
+  bool _locationTrackingEnabled = true;
+  bool _sensorDataEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    // Load data collection preferences from SharedPreferences
+    final prefs = await DatabaseProvider.instance.getPreferences();
+    setState(() {
+      // Always use the stored preference, not the current theme
+      _isDarkTheme = prefs['isDarkTheme'] ?? false;
+      _dataCollectionEnabled = prefs['dataCollectionEnabled'] ?? false;
+      _locationTrackingEnabled = prefs['locationTrackingEnabled'] ?? true;
+      _sensorDataEnabled = prefs['sensorDataEnabled'] ?? false;
+    });
+  }
+
+  Future<void> _savePreferences() async {
+    await DatabaseProvider.instance.savePreferences({
+      'isDarkTheme': _isDarkTheme,
+      'dataCollectionEnabled': _dataCollectionEnabled,
+      'locationTrackingEnabled': _locationTrackingEnabled,
+      'sensorDataEnabled': _sensorDataEnabled,
+    });
+  }
+
+  void _toggleTheme() async {
+    setState(() {
+      _isDarkTheme = !_isDarkTheme;
+    });
+    // Save immediately for persistence
+    await _savePreferences();
+    // Find the MyApp state and toggle theme
+    final state = context.findAncestorStateOfType<_MyAppState>();
+    state?._toggleTheme(_isDarkTheme);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Preferences'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: () async {
+              await _savePreferences();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Preferences saved')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Theme Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Appearance',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    title: const Text('Dark Theme'),
+                    subtitle: const Text('Use dark theme for better visibility in low light'),
+                    value: _isDarkTheme,
+                    onChanged: (value) => _toggleTheme(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Data Collection Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Data Collection & Privacy',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Help us improve route optimization by sharing anonymous usage data',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  SwitchListTile(
+                    title: const Text('Enable Data Collection'),
+                    subtitle: const Text('Share anonymous route data for ML training'),
+                    value: _dataCollectionEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _dataCollectionEnabled = value;
+                      });
+                    },
+                  ),
+                  
+                  SwitchListTile(
+                    title: const Text('Location Tracking'),
+                    subtitle: const Text('Track location for route optimization'),
+                    value: _locationTrackingEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _locationTrackingEnabled = value;
+                      });
+                    },
+                  ),
+                  
+                  SwitchListTile(
+                    title: const Text('Sensor Data'),
+                    subtitle: const Text('Collect accelerometer and gyroscope data'),
+                    value: _sensorDataEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _sensorDataEnabled = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Data Collection Terms
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Why We Collect Data',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '• Route Optimization: Your delivery routes help us improve algorithms\n'
+                    '• Traffic Patterns: Location data helps predict real-time traffic\n'
+                    '• Performance: Sensor data helps optimize battery usage\n'
+                    '• Anonymization: All data is anonymized and cannot identify you\n'
+                    '• Purpose: Improve delivery efficiency for all users',
+                    style: TextStyle(height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Data Usage Terms',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'By enabling data collection, you agree that:\n'
+                          '• Data is used solely for route optimization\n'
+                          '• No personal information is collected\n'
+                          '• Data may be used for research purposes\n'
+                          '• You can disable collection at any time',
+                          style: TextStyle(height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Storage Management
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Storage Management',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Clear All Data'),
+                    subtitle: const Text('Delete all saved routes and preferences'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showClearDataDialog(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearDataDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Data'),
+        content: const Text(
+          'This will delete all saved routes, preferences, and CSV files. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              // Clear all data
+              await DatabaseProvider.instance.clearAllData();
+              if (mounted) {
+                Navigator.pop(context);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('All data cleared')),
+                );
+              }
+            },
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
   @override
@@ -1173,6 +1643,7 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _checkSession();
+    _loadThemePreference();
   }
 
   Future<void> _checkSession() async {
@@ -1181,6 +1652,16 @@ class _MyAppState extends State<MyApp> {
       _isLoggedIn = session != null;
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadThemePreference() async {
+    final prefs = await DatabaseProvider.instance.getPreferences();
+    final isDarkTheme = prefs['isDarkTheme'] ?? false;
+    if (mounted) {
+      setState(() {
+        _mode = isDarkTheme ? ThemeMode.dark : ThemeMode.light;
+      });
+    }
   }
 
   void _toggleTheme(bool isDark) {
@@ -1282,35 +1763,11 @@ void main() {
 // ------ Helpers: dialogs -------
 extension _Dialogs on _MapScreenState {
   void _openSettings() {
-    bool isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Settings'),
-          content: StatefulBuilder(
-            builder: (ctx, setS) => Row(
-              children: [
-                const Text('Dark theme'),
-                const SizedBox(width: 12),
-                Switch(
-                  value: isDark,
-                  onChanged: (v) {
-                    isDark = v;
-                    // Bubble up via finding MyApp state
-                    final state = context.findAncestorStateOfType<_MyAppState>();
-                    state?._toggleTheme(v);
-                    setS(() {});
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          ],
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PreferencesScreen(),
+      ),
     );
   }
 
@@ -1330,20 +1787,56 @@ extension _Dialogs on _MapScreenState {
         setState(() {
           _savedRoutes.removeAt(idx);
         });
+        _updateCSVFile(); // Update CSV file after deletion
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Route deleted')),
+        );
       },
       onLoad: (idx) {
+        final route = _savedRoutes[idx];
         setState(() {
-          _addresses
-            ..clear()
-            ..addAll(_savedRoutes[idx]);
+          _addresses.clear();
+          _addresses.addAll(route['addresses'] as List<String>);
+          _predictedEtaMinutes = route['eta'] as double?;
         });
         _clearCurrentRoute();
         Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Route "${route['name']}" loaded')),
+        );
       },
     )));
   }
 
-  Future<void> _pickAndUploadImage() async {
+  Future<void> _updateCSVFile() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/saved_routes.csv');
+      
+      List<List<dynamic>> csvData = [
+        ['Name', 'Description', 'Addresses', 'ETA (minutes)', 'Timestamp', 'Coordinates']
+      ];
+      
+      for (final route in _savedRoutes) {
+        csvData.add([
+          route['name'],
+          route['description'],
+          (route['addresses'] as List).join('; '),
+          route['eta']?.toString() ?? '',
+          route['timestamp'],
+          (route['coordinates'] as List).map((coord) => '${coord['lat']},${coord['lng']}').join('; '),
+        ]);
+      }
+      
+      final csvString = const ListToCsvConverter().convert(csvData);
+      await file.writeAsString(csvString);
+    } catch (e) {
+      print('Error updating CSV file: $e');
+    }
+  }
+
+  // Unused method - commented out to fix linting
+  /* Future<void> _pickAndUploadImage() async {
     final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
     if (img == null) return;
 
@@ -1359,7 +1852,7 @@ extension _Dialogs on _MapScreenState {
       }
       // Heuristic split by newlines/semicolons
       final parts = text.split(RegExp(r'[\n;]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      setState(() {
+    setState(() {
         _addresses.addAll(parts);
       });
     } catch (e) {
@@ -1367,9 +1860,10 @@ extension _Dialogs on _MapScreenState {
         SnackBar(content: Text('OCR failed: $e')),
       );
     }
-  }
+  } */
 
-  Future<void> _goToMyLocation() async {
+  // Unused method - commented out to fix linting
+  /* Future<void> _goToMyLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -1404,11 +1898,11 @@ extension _Dialogs on _MapScreenState {
         SnackBar(content: Text('Location error: $e')),
       );
     }
-  }
+  } */
 }
 
 class SavedRoutesPage extends StatelessWidget {
-  final List<List<String>> savedRoutes;
+  final List<Map<String, dynamic>> savedRoutes;
   final void Function(int index) onDelete;
   final void Function(int index) onLoad;
   const SavedRoutesPage({super.key, required this.savedRoutes, required this.onDelete, required this.onLoad});
@@ -1416,49 +1910,125 @@ class SavedRoutesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Saved Routes')),
+      appBar: AppBar(
+        title: const Text('Saved Routes'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              // Refresh saved routes
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
       body: savedRoutes.isEmpty
-          ? const Center(child: Text('No saved routes yet'))
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.route_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(height: 16),
+            Text(
+                    'No saved routes yet',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Plan and save your first route to see it here',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+            ),
+          ],
+        ),
+            )
           : ListView.separated(
               itemCount: savedRoutes.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (_, i) => ListTile(
-                leading: const Icon(Icons.route),
-                title: Text(savedRoutes[i].join('  →  '), maxLines: 2, overflow: TextOverflow.ellipsis),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.download),
-                      tooltip: 'Export',
-                      onPressed: () {
-                        final content = savedRoutes[i].join('\n');
-                        // For now: show a dialog with copyable content. (File export would require storage permissions.)
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Export Route'),
-                            content: SingleChildScrollView(child: SelectableText(content)),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-                            ],
+              itemBuilder: (_, i) {
+                final route = savedRoutes[i];
+                final addresses = route['addresses'] as List<String>;
+                final name = route['name'] as String;
+                final description = route['description'] as String;
+                final eta = route['eta'] as double?;
+                
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      child: Icon(
+                        Icons.route,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    title: Text(
+                      name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (description.isNotEmpty)
+                          Text(
+                            description,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        );
-                      },
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${addresses.length} stops',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            if (eta != null) ...[
+                              Icon(
+                                Icons.access_time,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${eta.toStringAsFixed(0)} min',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.upload),
-                      tooltip: 'Load',
-                      onPressed: () => onLoad(i),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.upload),
+                          tooltip: 'Load Route',
+                          onPressed: () => onLoad(i),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Delete Route',
+                          onPressed: () => onDelete(i),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => onDelete(i),
-                    ),
-                  ],
-                ),
-                onTap: () => onLoad(i),
-              ),
+                    onTap: () => onLoad(i),
+                  ),
+                );
+              },
             ),
     );
   }

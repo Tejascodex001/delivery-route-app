@@ -28,23 +28,36 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# Set up logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load environment variables from .env file
 def load_env_file():
     """Load environment variables from .env file if it exists"""
-    env_file = '.env'
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key] = value
+    # Try multiple possible locations for .env file
+    possible_paths = [
+        '.env',  # Current directory
+        os.path.join(os.path.dirname(__file__), '.env'),  # Same directory as main.py
+        os.path.join(os.getcwd(), '.env'),  # Current working directory
+    ]
+    
+    for env_file in possible_paths:
+        if os.path.exists(env_file):
+            logger.info(f"Loading environment variables from: {env_file}")
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        os.environ[key] = value
+                        logger.info(f"Loaded env var: {key}")
+            return True
+    
+    logger.warning("No .env file found in any of the expected locations")
+    return False
 
 load_env_file()
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # --- Initialize Models ---
 try:
@@ -220,45 +233,31 @@ def send_verification_email(email: str, otp: str) -> bool:
     </html>
     """
 
-    # Try SMTP first if env vars present
+    # Use SMTP with environment variables
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
-    if gmail_user and gmail_app_password:
-        try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = "Your Delivery Route Optimizer Verification Code"
-            msg['From'] = gmail_user
-            msg['To'] = email
-            msg.attach(MIMEText(body_html, 'html'))
-
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-                smtp.login(gmail_user, gmail_app_password)
-                smtp.sendmail(gmail_user, [email], msg.as_string())
-
-            logger.info(f"Verification email sent via SMTP to {email}")
-            return True
-        except Exception as e:
-            logger.error(f"SMTP send failed, will try Gmail API fallback: {e}")
-            # Fall through to OAuth fallback below
-
-    # Fallback to Gmail API OAuth if configured
+    
+    if not gmail_user or not gmail_app_password:
+        logger.warning("Gmail credentials not found in environment variables. Logging OTP to console.")
+        logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
+        return False
+    
     try:
-        service = get_gmail_service()
-        if not service:
-            logger.warning("No email transport available. Logging OTP to console.")
-            logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
-            return False
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = "Your Delivery Route Optimizer Verification Code"
+        msg['From'] = gmail_user
+        msg['To'] = email
+        msg.attach(MIMEText(body_html, 'html'))
 
-        message = MIMEMultipart()
-        message['to'] = email
-        message['subject'] = "Your Delivery Route Optimizer Verification Code"
-        message.attach(MIMEText(body_html, 'html'))
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        send_message = service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
-        logger.info(f"Verification email sent via Gmail API to {email} (Message ID: {send_message['id']})")
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(gmail_user, gmail_app_password)
+            smtp.sendmail(gmail_user, [email], msg.as_string())
+
+        logger.info(f"✅ Verification email sent via SMTP to {email}")
         return True
     except Exception as e:
-        logger.error(f"Gmail API send failed. Logging OTP to console. Error: {e}")
+        logger.error(f"❌ SMTP send failed: {e}")
+        logger.warning("Logging OTP to console as fallback.")
         logger.info(f"[EMAIL] To: {email} | Subject: Your verification code | Body: Your OTP is: {otp}")
         return False
 
@@ -330,13 +329,12 @@ class PlannedRouteResponse(BaseModel):
     route_geometry_geojson: Optional[Dict[str, Any]] = None
 
 # --- Geocoding and ORS Utilities ---
-# You can paste your OpenRouteService API key here. If left empty, the code
-# will fall back to reading the key from the ORS_API_KEY environment variable.
-ORS_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0="
+# Load API keys from environment variables
+ORS_API_KEY: str = os.environ.get("ORS_API_KEY", "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0=")
 
 # Traffic data API keys (optional - for real-time traffic)
-MAPMYINDIA_API_KEY: str = ""  # Add your MapmyIndia API key here
-TRAFFIC_API_KEY: str = ""     # Add your traffic API key here
+MAPMYINDIA_API_KEY: str = os.environ.get("MAPMYINDIA_API_KEY", "")
+TRAFFIC_API_KEY: str = os.environ.get("TRAFFIC_API_KEY", "")
 
 # OpenRouteService provides both routing AND geocoding services
 # FREE: 1,000 geocoding requests/day, no credit card required
@@ -364,17 +362,24 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     if ORS_API_KEY:
         try:
             url = "https://api.openrouteservice.org/geocode/search"
-            headers = {"Authorization": ORS_API_KEY}
+            # Try different header formats for ORS API
+            headers = {"Authorization": f"Bearer {ORS_API_KEY}"}
             params = {
-                "api_key": ORS_API_KEY,
                 "text": address,
                 "boundary.country": "IN",  # Focus on India
-                "size": 10,  # Get more results to find better matches
-                "layers": "address,poi,street,locality,neighbourhood",  # More specific layers
-                "sources": "osm,oa,wof,gn"  # Multiple data sources
+                "size": 5,  # Reduce size to avoid potential issues
+                "layers": "address,poi,street",  # Simplified layers
+                "sources": "osm"  # Single source to avoid conflicts
             }
             logger.info(f"🔍 ORS geocoding request for '{address}' with key: {ORS_API_KEY[:20]}...")
             resp = requests.get(url, params=params, headers=headers, timeout=10)
+            
+            # If Bearer format fails, try without Bearer
+            if resp.status_code == 401 or resp.status_code == 400:
+                logger.warning(f"🔄 Retrying ORS with different auth format...")
+                headers = {"Authorization": ORS_API_KEY}
+                resp = requests.get(url, params=params, headers=headers, timeout=10)
+            
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("features"):
@@ -427,8 +432,10 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
             else:
                 logger.warning(f"❌ ORS API error for '{address}': HTTP {resp.status_code}")
                 logger.warning(f"   Response: {resp.text[:200]}...")
+                # Don't fail completely, continue to Nominatim fallback
         except Exception as e:
             logger.error(f"❌ ORS geocoding error for '{address}': {e}")
+            # Continue to Nominatim fallback
     
     # Fallback to Nominatim with better parameters
     logger.info(f"🔄 Trying Nominatim fallback for '{address}'")
@@ -449,6 +456,17 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
         data = resp.json()
         if not data:
             logger.warning(f"❌ No geocoding results for '{address}' from any service")
+            # Try a simple fallback for common Indian cities
+            address_lower = address.lower()
+            if 'bangalore' in address_lower or 'bengaluru' in address_lower:
+                logger.info(f"🔄 Using Bangalore fallback coordinates")
+                return (12.9716, 77.5946)  # Bangalore center
+            elif 'mumbai' in address_lower or 'bombay' in address_lower:
+                logger.info(f"🔄 Using Mumbai fallback coordinates")
+                return (19.0760, 72.8777)  # Mumbai center
+            elif 'delhi' in address_lower or 'new delhi' in address_lower:
+                logger.info(f"🔄 Using Delhi fallback coordinates")
+                return (28.6139, 77.2090)  # Delhi center
             return None
         
         # Try to find the best match from Nominatim results

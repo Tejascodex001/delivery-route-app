@@ -167,6 +167,41 @@ class DatabaseProvider {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_session');
   }
+
+  // Preferences Management
+  Future<void> savePreferences(Map<String, dynamic> preferences) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in preferences.entries) {
+      if (entry.value is bool) {
+        await prefs.setBool(entry.key, entry.value);
+      } else if (entry.value is String) {
+        await prefs.setString(entry.key, entry.value);
+      } else if (entry.value is int) {
+        await prefs.setInt(entry.key, entry.value);
+      } else if (entry.value is double) {
+        await prefs.setDouble(entry.key, entry.value);
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> getPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'isDarkTheme': prefs.getBool('isDarkTheme') ?? false,
+      'dataCollectionEnabled': prefs.getBool('dataCollectionEnabled') ?? false,
+      'locationTrackingEnabled': prefs.getBool('locationTrackingEnabled') ?? true,
+      'sensorDataEnabled': prefs.getBool('sensorDataEnabled') ?? false,
+    };
+  }
+
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    
+    // Clear database
+    final db = await database;
+    await db.delete('users');
+  }
 }
 
 
