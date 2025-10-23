@@ -36,7 +36,7 @@ class EmailService {
           'template_params': {
             'to_email': email,
             'verification_code': verificationCode,
-            'app_name': 'Delivery Route Optimizer',
+            'app_name': 'ZipRoute',
           }
         }),
       );

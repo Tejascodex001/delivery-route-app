@@ -17,7 +17,7 @@ class _SignInPageState extends State<SignInPage> {
   final _password = TextEditingController();
   bool _loading = false;
   bool _obscurePassword = true;
-  final _api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
+  final _api = const ApiClient();
 
   Future<void> _signIn() async {
     // Clear any prefilled spaces

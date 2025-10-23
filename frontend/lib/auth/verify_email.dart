@@ -11,7 +11,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   final _codeController = TextEditingController();
   bool _loading = false;
   String? _email;
-  final _api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
+  final _api = const ApiClient();
 
   @override
   void initState() {

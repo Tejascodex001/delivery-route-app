@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'config.dart';
 
 class ApiClient {
-  final String baseUrl; // e.g., http://127.0.0.1:8000
-  const ApiClient({required this.baseUrl});
+  static String get baseUrl => ApiConfig.baseUrl;
+  const ApiClient();
 
   Future<Map<String, dynamic>> planFullRoute({
     required List<String> addresses,

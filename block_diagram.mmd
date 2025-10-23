@@ -1,0 +1,42 @@
+
+graph TD
+    A[User Input: Addresses] --> B[Frontend Flutter App]
+    B --> C[Authentication System]
+    C --> D[Address Geocoding]
+    D --> E[Route Optimization Engine]
+    E --> F[ETA Prediction Model]
+    F --> G[Route Visualization]
+    G --> H[Optimized Route Output]
+    
+    subgraph "Stage 1: Data Processing"
+        D --> D1[OpenRouteService API]
+        D --> D2[Nominatim Fallback]
+        D1 --> D3[Coordinate Extraction]
+        D2 --> D3
+    end
+    
+    subgraph "Stage 2: Route Optimization"
+        E --> E1[Distance Matrix Calculation]
+        E1 --> E2[Nearest Neighbor Algorithm]
+        E2 --> E3[2-Opt Improvement]
+        E3 --> E4[Traffic Multiplier Application]
+    end
+    
+    subgraph "Stage 3: ML Prediction & Output"
+        F --> F1[XGBoost Model]
+        F1 --> F2[Time-based Features]
+        F2 --> F3[Traffic Analysis]
+        F3 --> F4[Final ETA Prediction]
+    end
+    
+    I[OCR Module] --> J[Address Extraction]
+    J --> D
+    
+    K[Training Data Collection] --> L[Model Retraining]
+    L --> F1
+    
+    style A fill:#e1f5fe
+    style H fill:#c8e6c9
+    style F1 fill:#fff3e0
+    style E2 fill:#f3e5f5
+    style D1 fill:#e8f5e8

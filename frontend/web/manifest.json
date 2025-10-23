@@ -3,9 +3,9 @@
     "short_name": "delivery_route_frontend",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Delivery Route Optimizer Frontend",
+    "background_color": "#1976D2",
+    "theme_color": "#1976D2",
+    "description": "ZipRoute Frontend",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

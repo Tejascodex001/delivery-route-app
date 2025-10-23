@@ -1,0 +1,43 @@
+
+graph LR
+    subgraph "Input Layer"
+        A1[User Addresses]
+        A2[Image Upload]
+        A3[User Credentials]
+    end
+    
+    subgraph "Processing Layer"
+        B1[Geocoding Service]
+        B2[OCR Processing]
+        B3[Authentication]
+        B4[Route Optimization]
+        B5[ML Prediction]
+    end
+    
+    subgraph "Output Layer"
+        C1[Optimized Route]
+        C2[ETA Prediction]
+        C3[Map Visualization]
+        C4[User Dashboard]
+    end
+    
+    A1 --> B1
+    A2 --> B2
+    A3 --> B3
+    B1 --> B4
+    B2 --> B1
+    B3 --> B4
+    B4 --> B5
+    B5 --> C1
+    B5 --> C2
+    C1 --> C3
+    C2 --> C3
+    C3 --> C4
+    
+    style A1 fill:#e3f2fd
+    style A2 fill:#e3f2fd
+    style A3 fill:#e3f2fd
+    style C1 fill:#e8f5e8
+    style C2 fill:#e8f5e8
+    style C3 fill:#e8f5e8
+    style C4 fill:#e8f5e8

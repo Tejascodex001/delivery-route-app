@@ -18,7 +18,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  final _api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
+  final _api = const ApiClient();
 
   Future<void> _signUp() async {
     // Clear any prefilled values
@@ -119,7 +119,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text('Join Delivery Route Optimizer',
+                    Text('Join ZipRoute',
                         textAlign: TextAlign.center,
                         style: Theme.of(context)
                             .textTheme

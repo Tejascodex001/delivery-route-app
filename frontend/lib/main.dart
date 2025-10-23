@@ -16,6 +16,8 @@ import 'services/db.dart';
 import 'services/location_service.dart';
 import 'services/sensor_service.dart';
 import 'services/training_data_service.dart';
+import 'backend_config_screen.dart';
+import 'config.dart';
 
 class MapScreen extends StatefulWidget {
   final void Function()? onOpenSavedRoutes;
@@ -27,8 +29,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // Use your machine's actual IP address
-  final api = const ApiClient(baseUrl: 'http://192.168.0.101:8000');
+  // Dynamic backend detection
+  final api = const ApiClient();
   final mapController = MapController();
   final TextEditingController _addrController = TextEditingController();
   final FocusNode _addrFocus = FocusNode();
@@ -41,7 +43,6 @@ class _MapScreenState extends State<MapScreen> {
   List<String> _orderedAddresses = []; // Track optimized order of addresses
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
-  LatLng? _current;
   LatLng? _currentLocation;
   bool _showCurrentLocation = false;
   
@@ -706,47 +707,189 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _openExternalNav() async {
-    if (_ordered.length < 2) return;
-    final origin = _ordered.first;
-    final dest = _ordered.last;
-    final waypoints = _ordered
-        .skip(1)
-        .take(_ordered.length - 2)
-        .map((p) => '${p.latitude},${p.longitude}')
-        .join('|');
-    
-    // Try multiple navigation options
-    final urls = [
-      // Google Maps web
-      'https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}' +
-          (waypoints.isNotEmpty ? '&waypoints=$waypoints' : '') +
-          '&travelmode=driving',
-      // Google Maps app (if installed)
-      'comgooglemaps://?daddr=${dest.latitude},${dest.longitude}&saddr=${origin.latitude},${origin.longitude}',
-      // Alternative: OpenStreetMap
-      'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.latitude},${origin.longitude};${dest.latitude},${dest.longitude}',
-    ];
-    
-    bool launched = false;
-    for (final urlString in urls) {
-      try {
-        final uri = Uri.parse(urlString);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          launched = true;
-          break;
-        }
-      } catch (e) {
-        print('Failed to launch $urlString: $e');
-        continue;
-      }
-    }
-    
-    if (!launched) {
+    if (_ordered.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not open navigation app. Please install Google Maps or use a web browser.'),
+          content: Text('Please plan a route first'),
+          backgroundColor: Colors.orange,
         ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final origin = _ordered.first;
+      final dest = _ordered.last;
+      final waypoints = _ordered
+          .skip(1)
+          .take(_ordered.length - 2)
+          .map((p) => '${p.latitude},${p.longitude}')
+          .join('|');
+      
+      // Enhanced Google Maps URLs with better formatting
+      final urls = [
+        // Google Maps app (preferred - most reliable)
+        'comgooglemaps://?daddr=${dest.latitude},${dest.longitude}&saddr=${origin.latitude},${origin.longitude}${waypoints.isNotEmpty ? '&waypoints=$waypoints' : ''}',
+        
+        // Google Maps web with optimized parameters
+        'https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}' +
+            (waypoints.isNotEmpty ? '&waypoints=$waypoints' : '') +
+            '&travelmode=driving&dir_action=navigate',
+        
+        // Alternative: Apple Maps (for iOS)
+        'http://maps.apple.com/?daddr=${dest.latitude},${dest.longitude}&saddr=${origin.latitude},${origin.longitude}',
+        
+        // Fallback: OpenStreetMap
+        'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.latitude},${origin.longitude};${dest.latitude},${dest.longitude}',
+      ];
+      
+      bool launched = false;
+      String? launchedApp;
+      
+      for (int i = 0; i < urls.length; i++) {
+        try {
+          final uri = Uri.parse(urls[i]);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            launched = true;
+            
+            // Determine which app was launched
+            if (i == 0) launchedApp = 'Google Maps App';
+            else if (i == 1) launchedApp = 'Google Maps Web';
+            else if (i == 2) launchedApp = 'Apple Maps';
+            else launchedApp = 'OpenStreetMap';
+            
+            break;
+          }
+        } catch (e) {
+          print('Failed to launch ${urls[i]}: $e');
+          continue;
+        }
+      }
+      
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      if (launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🚗 Navigation opened in $launchedApp'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        // Show manual navigation options
+        _showNavigationOptions(origin, dest, waypoints);
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error opening navigation: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showNavigationOptions(LatLng origin, LatLng dest, String waypoints) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Navigation Options'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Choose your preferred navigation app:'),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.map, color: Colors.blue),
+              title: const Text('Google Maps'),
+              subtitle: const Text('Open in browser'),
+              onTap: () {
+                Navigator.pop(context);
+                _launchGoogleMapsWeb(origin, dest, waypoints);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.navigation, color: Colors.green),
+              title: const Text('Apple Maps'),
+              subtitle: const Text('iOS Maps app'),
+              onTap: () {
+                Navigator.pop(context);
+                _launchAppleMaps(origin, dest);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.public, color: Colors.orange),
+              title: const Text('OpenStreetMap'),
+              subtitle: const Text('Open source maps'),
+              onTap: () {
+                Navigator.pop(context);
+                _launchOpenStreetMap(origin, dest);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchGoogleMapsWeb(LatLng origin, LatLng dest, String waypoints) async {
+    final url = 'https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}' +
+        (waypoints.isNotEmpty ? '&waypoints=$waypoints' : '') +
+        '&travelmode=driving&dir_action=navigate';
+    
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open Google Maps: $e')),
+      );
+    }
+  }
+
+  Future<void> _launchAppleMaps(LatLng origin, LatLng dest) async {
+    final url = 'http://maps.apple.com/?daddr=${dest.latitude},${dest.longitude}&saddr=${origin.latitude},${origin.longitude}';
+    
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open Apple Maps: $e')),
+      );
+    }
+  }
+
+  Future<void> _launchOpenStreetMap(LatLng origin, LatLng dest) async {
+    final url = 'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.latitude},${origin.longitude};${dest.latitude},${dest.longitude}';
+    
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open OpenStreetMap: $e')),
       );
     }
   }
@@ -754,11 +897,63 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: _ordered.length >= 2
+          ? FloatingActionButton.extended(
+              onPressed: _openExternalNav,
+              icon: const Icon(Icons.navigation),
+              label: const Text('Navigate'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            )
+          : null,
       appBar: AppBar(
-        title: const Text('RouteOptimizer'),
+        title: const Text('ZipRoute'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          // Network status indicator
+          FutureBuilder<Map<String, dynamic>>(
+            future: ApiConfig.getNetworkInfo(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final info = snapshot.data!;
+                final isProduction = info['is_production'] == true;
+                return Tooltip(
+                  message: 'Backend: ${info['backend_url']}\nMode: ${isProduction ? 'Production' : 'Development'}',
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isProduction ? Colors.green : Colors.blue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isProduction ? Icons.cloud : Icons.router,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isProduction ? 'PROD' : 'DEV',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
       ),
       drawer: Drawer(
         child: SafeArea(
@@ -787,6 +982,19 @@ class _MapScreenState extends State<MapScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _openSettings();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.router),
+                title: const Text('Backend Config'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BackendConfigScreen(),
+                    ),
+                  );
                 },
               ),
               ListTile(
@@ -1326,6 +1534,36 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        // Quick navigation info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Tap "Navigate" to open in Google Maps with turn-by-turn directions',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ],
                 ),
@@ -1774,7 +2012,7 @@ extension _Dialogs on _MapScreenState {
   void _openAbout() {
     showAboutDialog(
       context: context,
-      applicationName: 'Delivery Route Optimizer',
+      applicationName: 'ZipRoute',
       applicationVersion: '1.0.0',
       applicationLegalese: 'Map data © OpenStreetMap contributors',
     );
@@ -1783,29 +2021,33 @@ extension _Dialogs on _MapScreenState {
   void _openSavedRoutesPage() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => SavedRoutesPage(
       savedRoutes: _savedRoutes,
-      onDelete: (idx) {
-        setState(() {
-          _savedRoutes.removeAt(idx);
-        });
-        _updateCSVFile(); // Update CSV file after deletion
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Route deleted')),
-        );
-      },
-      onLoad: (idx) {
-        final route = _savedRoutes[idx];
-        setState(() {
-          _addresses.clear();
-          _addresses.addAll(route['addresses'] as List<String>);
-          _predictedEtaMinutes = route['eta'] as double?;
-        });
-        _clearCurrentRoute();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Route "${route['name']}" loaded')),
-        );
-      },
+      onDelete: (idx) => _deleteSavedRoute(idx),
+      onLoad: (idx) => _loadSavedRoute(idx),
     )));
+  }
+
+  void _deleteSavedRoute(int idx) {
+    setState(() {
+      _savedRoutes.removeAt(idx);
+    });
+    _updateCSVFile(); // Update CSV file after deletion
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Route deleted')),
+    );
+  }
+
+  void _loadSavedRoute(int idx) {
+    final route = _savedRoutes[idx];
+    setState(() {
+      _addresses.clear();
+      _addresses.addAll(route['addresses'] as List<String>);
+      _predictedEtaMinutes = route['eta'] as double?;
+    });
+    _clearCurrentRoute();
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Route "${route['name']}" loaded')),
+    );
   }
 
   Future<void> _updateCSVFile() async {

@@ -1,0 +1,32 @@
+
+graph TD
+    A[Raw Route Data] --> B[Data Preprocessing]
+    B --> C[Feature Engineering]
+    C --> D[Train/Test Split]
+    D --> E[XGBoost Training]
+    E --> F[Model Evaluation]
+    F --> G[Model Deployment]
+    G --> H[Real-time Prediction]
+    
+    subgraph "Feature Engineering"
+        C --> C1[Time of Day]
+        C --> C2[Distance Features]
+        C --> C3[Traffic Multipliers]
+        C --> C4[Route Complexity]
+    end
+    
+    subgraph "Model Training"
+        E --> E1[Hyperparameter Tuning]
+        E1 --> E2[Cross Validation]
+        E2 --> E3[Performance Metrics]
+    end
+    
+    subgraph "Production"
+        H --> H1[ETA Prediction]
+        H1 --> H2[Route Optimization]
+        H2 --> H3[User Interface]
+    end
+    
+    style A fill:#ffebee
+    style G fill:#e8f5e8
+    style H3 fill:#e3f2fd

@@ -1,0 +1,28 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="512" cy="512" r="512" fill="#1976D2"/>
+  
+  <!-- Route path -->
+  <path d="M200 400 L300 300 L500 350 L700 250 L800 400 L900 350" 
+        stroke="white" 
+        stroke-width="20" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  
+  <!-- Location markers -->
+  <circle cx="200" cy="400" r="15" fill="white"/>
+  <circle cx="300" cy="300" r="12" fill="white"/>
+  <circle cx="500" cy="350" r="12" fill="white"/>
+  <circle cx="700" cy="250" r="12" fill="white"/>
+  <circle cx="800" cy="400" r="12" fill="white"/>
+  <circle cx="900" cy="350" r="15" fill="#4CAF50"/>
+  
+  <!-- Navigation arrow -->
+  <path d="M850 320 L880 350 L850 380 L870 350 Z" fill="white"/>
+  
+  <!-- Speed lines -->
+  <path d="M100 500 L150 500" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  <path d="M100 520 L140 520" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <path d="M100 540 L130 540" stroke="white" stroke-width="4" stroke-linecap="round"/>
+</svg>
