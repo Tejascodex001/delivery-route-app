@@ -1,0 +1,261 @@
+{
+  "test_summary": {
+    "total_tests": 33,
+    "passed_tests": 29,
+    "failed_tests": 4,
+    "error_tests": 0,
+    "success_rate": 87.88,
+    "avg_response_time": 0.125,
+    "min_response_time": 0.001,
+    "max_response_time": 3.951,
+    "test_duration": "0:00:04.081896",
+    "health_check_success_rate": 100.0
+  },
+  "detailed_results": [
+    {
+      "name": "Health Check",
+      "status": "PASS",
+      "response_time": 0.004548788070678711,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "API Documentation",
+      "status": "PASS",
+      "response_time": 0.0034072399139404297,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "OpenAPI Schema",
+      "status": "PASS",
+      "response_time": 0.08204007148742676,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "User Registration",
+      "status": "PASS",
+      "response_time": 3.950519323348999,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Geocoding Test",
+      "status": "FAIL",
+      "response_time": 0.0018482208251953125,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "Route Optimization",
+      "status": "FAIL",
+      "response_time": 0.0013418197631835938,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "ETA Prediction",
+      "status": "FAIL",
+      "response_time": 0.0007758140563964844,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "OCR Test",
+      "status": "FAIL",
+      "response_time": 0.0007197856903076172,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "Performance Test 1",
+      "status": "PASS",
+      "response_time": 0.0015783309936523438,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 2",
+      "status": "PASS",
+      "response_time": 0.0015594959259033203,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 3",
+      "status": "PASS",
+      "response_time": 0.00109100341796875,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 4",
+      "status": "PASS",
+      "response_time": 0.0009069442749023438,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 5",
+      "status": "PASS",
+      "response_time": 0.0011637210845947266,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 6",
+      "status": "PASS",
+      "response_time": 0.001277923583984375,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 7",
+      "status": "PASS",
+      "response_time": 0.0011954307556152344,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 8",
+      "status": "PASS",
+      "response_time": 0.001149892807006836,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 9",
+      "status": "PASS",
+      "response_time": 0.0012712478637695312,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 10",
+      "status": "PASS",
+      "response_time": 0.0011837482452392578,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.004111051559448242,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.007029533386230469,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.003364086151123047,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.002832174301147461,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.0023081302642822266,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.003754138946533203,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.005429506301879883,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.003050565719604492,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.0027208328247070312,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.002563953399658203,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.003903627395629883,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.0061986446380615234,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.003673553466796875,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.0023200511932373047,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.002887725830078125,
+      "status_code": 200,
+      "error": ""
+    }
+  ],
+  "performance_analysis": {
+    "p50": 0.002563953399658203,
+    "p95": 0.08204007148742676,
+    "p99": 3.950519323348999,
+    "std_deviation": 0.6869501459265928,
+    "fastest_response": 0.0007197856903076172,
+    "slowest_response": 3.950519323348999
+  },
+  "recommendations": [
+    "\ud83d\udfe1 Acceptable: Success rate above 80%. System is functional but needs optimization.",
+    "\ud83d\udfe2 Excellent: Core system health is excellent. Backend is stable and reliable.",
+    "\ud83d\udfe2 Excellent: Response times are optimal. System is very fast.",
+    "\u2705 System is ready for staging environment with good performance."
+  ]
+}

@@ -1,0 +1,1482 @@
+{
+  "test_suite": {
+    "name": "ngrok_backend_comprehensive_test",
+    "version": "1.0.0",
+    "description": "Comprehensive test suite for ngrok backend endpoints"
+  },
+  "backend_info": {
+    "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev",
+    "test_timestamp": "2025-10-24T17:41:53.563630",
+    "test_duration_seconds": 18.193
+  },
+  "summary": {
+    "total_tests": 10,
+    "successful_tests": 8,
+    "failed_tests": 2,
+    "success_rate_percent": 80.0,
+    "average_response_time_seconds": 0.982,
+    "overall_status": "FAIL"
+  },
+  "performance_metrics": {
+    "fastest_response_time": 0.155,
+    "slowest_response_time": 4.605,
+    "total_response_time": 18.182000000000002,
+    "average_response_size_bytes": 1779
+  },
+  "test_results": [
+    {
+      "name": "Root",
+      "method": "GET",
+      "endpoint": "/",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/",
+      "status_code": 200,
+      "response_time": 0.182,
+      "success": true,
+      "response_size": 80,
+      "timestamp": "2025-10-24T17:41:35.552807",
+      "response_data": {
+        "message": "Welcome to the AI Route Optimization API! It is running correctly."
+      }
+    },
+    {
+      "name": "Health Check",
+      "method": "GET",
+      "endpoint": "/health",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/health",
+      "status_code": 200,
+      "response_time": 0.155,
+      "success": true,
+      "response_size": 68,
+      "timestamp": "2025-10-24T17:41:35.709041",
+      "response_data": {
+        "status": "healthy",
+        "ocr_model_loaded": true,
+        "ml_models_loaded": true
+      }
+    },
+    {
+      "name": "API Docs",
+      "method": "GET",
+      "endpoint": "/docs",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/docs",
+      "status_code": 200,
+      "response_time": 0.159,
+      "success": true,
+      "response_size": 946,
+      "timestamp": "2025-10-24T17:41:35.868846",
+      "response_data": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://..."
+    },
+    {
+      "name": "OpenAPI Schema",
+      "method": "GET",
+      "endpoint": "/openapi.json",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/openapi.json",
+      "status_code": 200,
+      "response_time": 0.184,
+      "success": true,
+      "response_size": 15048,
+      "timestamp": "2025-10-24T17:41:36.053387",
+      "response_data": {
+        "openapi": "3.1.0",
+        "info": {
+          "title": "Delivery Logistics API",
+          "version": "0.1.0"
+        },
+        "paths": {
+          "/": {
+            "get": {
+              "summary": "Read Root",
+              "operationId": "read_root__get",
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/health": {
+            "get": {
+              "summary": "Health Check",
+              "description": "Health check endpoint",
+              "operationId": "health_check_health_get",
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/ocr/extract-text": {
+            "post": {
+              "summary": "Extract Text From Image",
+              "description": "Fixed OCR endpoint with correct parsing for new PaddleOCR format",
+              "operationId": "extract_text_from_image_ocr_extract_text_post",
+              "requestBody": {
+                "content": {
+                  "multipart/form-data": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Body_extract_text_from_image_ocr_extract_text_post"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/ocr/diagnose": {
+            "post": {
+              "summary": "Diagnose Ocr",
+              "description": "Diagnostic endpoint to troubleshoot OCR issues",
+              "operationId": "diagnose_ocr_ocr_diagnose_post",
+              "requestBody": {
+                "content": {
+                  "multipart/form-data": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Body_diagnose_ocr_ocr_diagnose_post"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/ocr/minimal-test": {
+            "post": {
+              "summary": "Minimal Ocr Test",
+              "description": "Minimal OCR test to isolate the issue",
+              "operationId": "minimal_ocr_test_ocr_minimal_test_post",
+              "requestBody": {
+                "content": {
+                  "multipart/form-data": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Body_minimal_ocr_test_ocr_minimal_test_post"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/predict-eta": {
+            "post": {
+              "summary": "Predict Eta",
+              "operationId": "predict_eta_predict_eta_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/RouteData"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/log-completed-route": {
+            "post": {
+              "summary": "Log Route",
+              "operationId": "log_route_log_completed_route_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/CompletedRoute"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/nearby-places": {
+            "get": {
+              "summary": "Get Nearby Places",
+              "description": "Get nearby famous places and landmarks.",
+              "operationId": "get_nearby_places_nearby_places_get",
+              "parameters": [
+                {
+                  "name": "lat",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "number",
+                    "title": "Lat"
+                  }
+                },
+                {
+                  "name": "lon",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "number",
+                    "title": "Lon"
+                  }
+                },
+                {
+                  "name": "radius",
+                  "in": "query",
+                  "required": false,
+                  "schema": {
+                    "type": "integer",
+                    "default": 5000,
+                    "title": "Radius"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/search-suggestions": {
+            "get": {
+              "summary": "Search Suggestions",
+              "description": "Get search suggestions using ORS geocoding API.",
+              "operationId": "search_suggestions_search_suggestions_get",
+              "parameters": [
+                {
+                  "name": "q",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "title": "Q"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/plan-full-route": {
+            "post": {
+              "summary": "Plan Full Route",
+              "operationId": "plan_full_route_plan_full_route_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/PlanRouteRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/PlannedRouteResponse"
+                      }
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/submit-training-data": {
+            "post": {
+              "summary": "Submit Training Data",
+              "description": "Submit training data for model improvement.",
+              "operationId": "submit_training_data_submit_training_data_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/TrainingDataRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/update-actual-eta": {
+            "patch": {
+              "summary": "Update Actual Eta",
+              "description": "Update actual ETA for a completed route.",
+              "operationId": "update_actual_eta_update_actual_eta_patch",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/UpdateEtaRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/training-data-stats": {
+            "get": {
+              "summary": "Get Training Data Stats",
+              "description": "Get statistics about collected training data.",
+              "operationId": "get_training_data_stats_training_data_stats_get",
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/test-segment": {
+            "get": {
+              "summary": "Test Segment",
+              "description": "Test a single segment to verify ORS calculation.",
+              "operationId": "test_segment_test_segment_get",
+              "parameters": [
+                {
+                  "name": "from_addr",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "title": "From Addr"
+                  }
+                },
+                {
+                  "name": "to_addr",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "title": "To Addr"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/traffic-config": {
+            "get": {
+              "summary": "Get Traffic Config",
+              "description": "Get current traffic configuration and multipliers.",
+              "operationId": "get_traffic_config_traffic_config_get",
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/auth/register": {
+            "post": {
+              "summary": "Register",
+              "operationId": "register_auth_register_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/RegisterRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/auth/verify-email": {
+            "post": {
+              "summary": "Verify Email",
+              "operationId": "verify_email_auth_verify_email_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/VerifyEmailRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/auth/login": {
+            "post": {
+              "summary": "Login",
+              "operationId": "login_auth_login_post",
+              "requestBody": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/LoginRequest"
+                    }
+                  }
+                },
+                "required": true
+              },
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/auth/dev-otp": {
+            "get": {
+              "summary": "Get Dev Otp",
+              "description": "Dev helper: returns the current OTP for an email for local testing.\nRequires environment variable DEV_MODE=1 to be set.",
+              "operationId": "get_dev_otp_auth_dev_otp_get",
+              "parameters": [
+                {
+                  "name": "email",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "title": "Email"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/auth/reset-users": {
+            "post": {
+              "summary": "Reset Users",
+              "description": "Debug-only: clears users and pending_users tables.",
+              "operationId": "reset_users_auth_reset_users_post",
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/debug-route": {
+            "get": {
+              "summary": "Debug Route",
+              "description": "Debug endpoint to check route calculation details.",
+              "operationId": "debug_route_debug_route_get",
+              "parameters": [
+                {
+                  "name": "addresses",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "title": "Addresses"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Successful Response",
+                  "content": {
+                    "application/json": {
+                      "schema": {}
+                    }
+                  }
+                },
+                "422": {
+                  "description": "Validation Error",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HTTPValidationError"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "components": {
+          "schemas": {
+            "Body_diagnose_ocr_ocr_diagnose_post": {
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "format": "binary",
+                  "title": "Image"
+                }
+              },
+              "type": "object",
+              "required": [
+                "image"
+              ],
+              "title": "Body_diagnose_ocr_ocr_diagnose_post"
+            },
+            "Body_extract_text_from_image_ocr_extract_text_post": {
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "format": "binary",
+                  "title": "Image"
+                }
+              },
+              "type": "object",
+              "required": [
+                "image"
+              ],
+              "title": "Body_extract_text_from_image_ocr_extract_text_post"
+            },
+            "Body_minimal_ocr_test_ocr_minimal_test_post": {
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "format": "binary",
+                  "title": "Image"
+                }
+              },
+              "type": "object",
+              "required": [
+                "image"
+              ],
+              "title": "Body_minimal_ocr_test_ocr_minimal_test_post"
+            },
+            "CompletedRoute": {
+              "properties": {
+                "start_time": {
+                  "type": "string",
+                  "title": "Start Time"
+                },
+                "end_time": {
+                  "type": "string",
+                  "title": "End Time"
+                },
+                "ors_duration_minutes": {
+                  "type": "number",
+                  "title": "Ors Duration Minutes"
+                },
+                "total_distance_km": {
+                  "type": "number",
+                  "title": "Total Distance Km"
+                },
+                "num_stops": {
+                  "type": "integer",
+                  "title": "Num Stops"
+                }
+              },
+              "type": "object",
+              "required": [
+                "start_time",
+                "end_time",
+                "ors_duration_minutes",
+                "total_distance_km",
+                "num_stops"
+              ],
+              "title": "CompletedRoute"
+            },
+            "HTTPValidationError": {
+              "properties": {
+                "detail": {
+                  "items": {
+                    "$ref": "#/components/schemas/ValidationError"
+                  },
+                  "type": "array",
+                  "title": "Detail"
+                }
+              },
+              "type": "object",
+              "title": "HTTPValidationError"
+            },
+            "LoginRequest": {
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "title": "Email"
+                },
+                "password": {
+                  "type": "string",
+                  "title": "Password"
+                }
+              },
+              "type": "object",
+              "required": [
+                "email",
+                "password"
+              ],
+              "title": "LoginRequest"
+            },
+            "PlanRouteRequest": {
+              "properties": {
+                "addresses": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Addresses"
+                },
+                "start_time": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Start Time"
+                },
+                "vehicle_start_address": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Vehicle Start Address"
+                }
+              },
+              "type": "object",
+              "required": [
+                "addresses"
+              ],
+              "title": "PlanRouteRequest"
+            },
+            "PlannedRouteResponse": {
+              "properties": {
+                "ordered_addresses": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Ordered Addresses"
+                },
+                "ordered_coordinates": {
+                  "items": {
+                    "prefixItems": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ],
+                    "type": "array",
+                    "maxItems": 2,
+                    "minItems": 2
+                  },
+                  "type": "array",
+                  "title": "Ordered Coordinates"
+                },
+                "ors_duration_minutes": {
+                  "type": "number",
+                  "title": "Ors Duration Minutes"
+                },
+                "total_distance_km": {
+                  "type": "number",
+                  "title": "Total Distance Km"
+                },
+                "num_stops": {
+                  "type": "integer",
+                  "title": "Num Stops"
+                },
+                "predicted_eta_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Predicted Eta Minutes"
+                },
+                "route_geometry_geojson": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Route Geometry Geojson"
+                }
+              },
+              "type": "object",
+              "required": [
+                "ordered_addresses",
+                "ordered_coordinates",
+                "ors_duration_minutes",
+                "total_distance_km",
+                "num_stops"
+              ],
+              "title": "PlannedRouteResponse"
+            },
+            "RegisterRequest": {
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "title": "Email"
+                },
+                "password": {
+                  "type": "string",
+                  "minLength": 6,
+                  "title": "Password"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Name"
+                }
+              },
+              "type": "object",
+              "required": [
+                "email",
+                "password"
+              ],
+              "title": "RegisterRequest"
+            },
+            "RouteData": {
+              "properties": {
+                "ors_duration_minutes": {
+                  "type": "number",
+                  "title": "Ors Duration Minutes"
+                },
+                "total_distance_km": {
+                  "type": "number",
+                  "title": "Total Distance Km"
+                },
+                "num_stops": {
+                  "type": "integer",
+                  "title": "Num Stops"
+                },
+                "start_time": {
+                  "type": "string",
+                  "title": "Start Time"
+                }
+              },
+              "type": "object",
+              "required": [
+                "ors_duration_minutes",
+                "total_distance_km",
+                "num_stops",
+                "start_time"
+              ],
+              "title": "RouteData"
+            },
+            "TrainingDataRequest": {
+              "properties": {
+                "route_id": {
+                  "type": "string",
+                  "title": "Route Id"
+                },
+                "addresses": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Addresses"
+                },
+                "coordinates": {
+                  "items": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array"
+                  },
+                  "type": "array",
+                  "title": "Coordinates"
+                },
+                "predicted_eta_minutes": {
+                  "type": "number",
+                  "title": "Predicted Eta Minutes"
+                },
+                "actual_eta_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Actual Eta Minutes"
+                },
+                "start_time": {
+                  "type": "string",
+                  "title": "Start Time"
+                },
+                "end_time": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "End Time"
+                },
+                "sensor_data": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Sensor Data"
+                },
+                "user_id": {
+                  "type": "string",
+                  "title": "User Id"
+                },
+                "route_metadata": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Route Metadata"
+                }
+              },
+              "type": "object",
+              "required": [
+                "route_id",
+                "addresses",
+                "coordinates",
+                "predicted_eta_minutes",
+                "start_time",
+                "sensor_data",
+                "user_id",
+                "route_metadata"
+              ],
+              "title": "TrainingDataRequest"
+            },
+            "UpdateEtaRequest": {
+              "properties": {
+                "route_id": {
+                  "type": "string",
+                  "title": "Route Id"
+                },
+                "actual_eta_minutes": {
+                  "type": "number",
+                  "title": "Actual Eta Minutes"
+                }
+              },
+              "type": "object",
+              "required": [
+                "route_id",
+                "actual_eta_minutes"
+              ],
+              "title": "UpdateEtaRequest"
+            },
+            "ValidationError": {
+              "properties": {
+                "loc": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "type": "array",
+                  "title": "Location"
+                },
+                "msg": {
+                  "type": "string",
+                  "title": "Message"
+                },
+                "type": {
+                  "type": "string",
+                  "title": "Error Type"
+                }
+              },
+              "type": "object",
+              "required": [
+                "loc",
+                "msg",
+                "type"
+              ],
+              "title": "ValidationError"
+            },
+            "VerifyEmailRequest": {
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "title": "Email"
+                },
+                "otp": {
+                  "type": "string",
+                  "maxLength": 8,
+                  "minLength": 4,
+                  "title": "Otp"
+                }
+              },
+              "type": "object",
+              "required": [
+                "email",
+                "otp"
+              ],
+              "title": "VerifyEmailRequest"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "User Registration",
+      "method": "POST",
+      "endpoint": "/auth/register",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/auth/register",
+      "status_code": 200,
+      "response_time": 4.605,
+      "success": true,
+      "response_size": 44,
+      "timestamp": "2025-10-24T17:41:40.659781",
+      "response_data": {
+        "message": "Verification OTP sent to email"
+      }
+    },
+    {
+      "name": "Search Suggestions",
+      "method": "GET",
+      "endpoint": "/search-suggestions",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/search-suggestions",
+      "status_code": 200,
+      "response_time": 1.285,
+      "success": true,
+      "response_size": 229,
+      "timestamp": "2025-10-24T17:41:41.945450",
+      "response_data": {
+        "suggestions": [
+          {
+            "display_name": "Mumbai, MH, India",
+            "lat": 19.131577,
+            "lon": 72.891418
+          },
+          {
+            "display_name": "Mumbai, MH, India",
+            "lat": 18.957375,
+            "lon": 72.855871
+          },
+          {
+            "display_name": "Mumbai City, MH, India",
+            "lat": 19.125501,
+            "lon": 72.897224
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nearby Places",
+      "method": "GET",
+      "endpoint": "/nearby-places",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/nearby-places",
+      "status_code": 200,
+      "response_time": 1.113,
+      "success": true,
+      "response_size": 1259,
+      "timestamp": "2025-10-24T17:41:43.060142",
+      "response_data": {
+        "places": [
+          {
+            "name": "Petrol Pump",
+            "amenity": "fuel",
+            "lat": 19.0763832,
+            "lon": 72.8773575,
+            "display_name": "Petrol Pump (Fuel)"
+          },
+          {
+            "name": "CNG",
+            "amenity": "fuel",
+            "lat": 19.0765873,
+            "lon": 72.8772337,
+            "display_name": "CNG (Fuel)"
+          },
+          {
+            "name": "AU Small Finance Bank",
+            "amenity": "bank",
+            "lat": 19.0758774,
+            "lon": 72.8768148,
+            "display_name": "AU Small Finance Bank (Bank)"
+          },
+          {
+            "name": "AU Small Finance Bank",
+            "amenity": "bank",
+            "lat": 19.0758249,
+            "lon": 72.876795,
+            "display_name": "AU Small Finance Bank (Bank)"
+          },
+          {
+            "name": "Karizma Dhaba",
+            "amenity": "restaurant",
+            "lat": 19.0770406,
+            "lon": 72.8780007,
+            "display_name": "Karizma Dhaba (Restaurant)"
+          },
+          {
+            "name": "Canara Bank",
+            "amenity": "bank",
+            "lat": 19.0751249,
+            "lon": 72.8764071,
+            "display_name": "Canara Bank (Bank)"
+          },
+          {
+            "name": "Hindustan Petroleum Baxis Singh and Co.",
+            "amenity": "fuel",
+            "lat": 19.0780631,
+            "lon": 72.8793332,
+            "display_name": "Hindustan Petroleum Baxis Singh and Co. (Fuel)"
+          },
+          {
+            "name": "Habib Hospital",
+            "amenity": "hospital",
+            "lat": 19.078247,
+            "lon": 72.880101,
+            "display_name": "Habib Hospital (Hospital)"
+          },
+          {
+            "name": "Muskaan Hospital",
+            "amenity": "hospital",
+            "lat": 19.078367,
+            "lon": 72.880408,
+            "display_name": "Muskaan Hospital (Hospital)"
+          },
+          {
+            "name": "Deluxe Restaurant",
+            "amenity": "restaurant",
+            "lat": 19.0726519,
+            "lon": 72.8761432,
+            "display_name": "Deluxe Restaurant (Restaurant)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Route Optimization",
+      "method": "POST",
+      "endpoint": "/plan-full-route",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/plan-full-route",
+      "status_code": 0,
+      "response_time": 10.144,
+      "success": false,
+      "error": "HTTPSConnectionPool(host='unseasonable-emely-unvoluminous.ngrok-free.dev', port=443): Read timed out. (read timeout=10)",
+      "timestamp": "2025-10-24T17:41:53.205513"
+    },
+    {
+      "name": "ETA Prediction",
+      "method": "POST",
+      "endpoint": "/predict-eta",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/predict-eta",
+      "status_code": 200,
+      "response_time": 0.173,
+      "success": true,
+      "response_size": 31,
+      "timestamp": "2025-10-24T17:41:53.378552",
+      "response_data": {
+        "predicted_eta_minutes": 81.45
+      }
+    },
+    {
+      "name": "OCR Text Extraction",
+      "method": "POST",
+      "endpoint": "/ocr/extract-text",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/ocr/extract-text",
+      "status_code": 422,
+      "response_time": 0.182,
+      "success": false,
+      "response_size": 90,
+      "timestamp": "2025-10-24T17:41:53.561737",
+      "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"image\"],\"msg\":\"Field required\",\"input\":null}]}"
+    }
+  ],
+  "successful_endpoints": [
+    {
+      "name": "Root",
+      "endpoint": "/",
+      "method": "GET",
+      "response_time": 0.182,
+      "status_code": 200
+    },
+    {
+      "name": "Health Check",
+      "endpoint": "/health",
+      "method": "GET",
+      "response_time": 0.155,
+      "status_code": 200
+    },
+    {
+      "name": "API Docs",
+      "endpoint": "/docs",
+      "method": "GET",
+      "response_time": 0.159,
+      "status_code": 200
+    },
+    {
+      "name": "OpenAPI Schema",
+      "endpoint": "/openapi.json",
+      "method": "GET",
+      "response_time": 0.184,
+      "status_code": 200
+    },
+    {
+      "name": "User Registration",
+      "endpoint": "/auth/register",
+      "method": "POST",
+      "response_time": 4.605,
+      "status_code": 200
+    },
+    {
+      "name": "Search Suggestions",
+      "endpoint": "/search-suggestions",
+      "method": "GET",
+      "response_time": 1.285,
+      "status_code": 200
+    },
+    {
+      "name": "Nearby Places",
+      "endpoint": "/nearby-places",
+      "method": "GET",
+      "response_time": 1.113,
+      "status_code": 200
+    },
+    {
+      "name": "ETA Prediction",
+      "endpoint": "/predict-eta",
+      "method": "POST",
+      "response_time": 0.173,
+      "status_code": 200
+    }
+  ],
+  "failed_endpoints": [
+    {
+      "name": "Route Optimization",
+      "endpoint": "/plan-full-route",
+      "method": "POST",
+      "status_code": 0,
+      "error": "HTTPSConnectionPool(host='unseasonable-emely-unvoluminous.ngrok-free.dev', port=443): Read timed out. (read timeout=10)"
+    },
+    {
+      "name": "OCR Text Extraction",
+      "endpoint": "/ocr/extract-text",
+      "method": "POST",
+      "status_code": 422,
+      "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"image\"],\"msg\":\"Field required\",\"input\":null}]}"
+    }
+  ],
+  "recommendations": [
+    "⚠️ 2 endpoints need attention",
+    "🔧 Fix Route Optimization endpoint: HTTPSConnectionPool(host='unseasonable-emely-unvoluminous.ngrok-free.dev', port=443): Read timed out. (read timeout=10)",
+    "🔧 Fix OCR Text Extraction endpoint: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"image\"],\"msg\":\"Field required\",\"input\":null}]}"
+  ],
+  "next_steps": [
+    "🔧 Fix failed endpoints before deployment",
+    "🧪 Re-run tests after fixes",
+    "📋 Review error logs for failed endpoints",
+    "🔄 Implement retry logic for flaky endpoints"
+  ]
+}

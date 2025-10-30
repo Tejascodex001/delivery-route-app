@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'config.dart';
+import 'utils/error_handler.dart';
 
 class ApiClient {
   static String get baseUrl => ApiConfig.baseUrl;
@@ -25,7 +26,8 @@ class ApiClient {
       body: jsonEncode(body),
     );
     if (resp.statusCode != 200) {
-      throw Exception('Backend error: ${resp.statusCode} ${resp.body}');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception(errorMessage);
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
@@ -37,7 +39,8 @@ class ApiClient {
     final streamed = await request.send();
     final resp = await http.Response.fromStream(streamed);
     if (resp.statusCode != 200) {
-      throw Exception('OCR error: ${resp.statusCode} ${resp.body}');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception('OCR error: $errorMessage');
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
@@ -48,7 +51,8 @@ class ApiClient {
     });
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
-      throw Exception('Search error: ${resp.statusCode} ${resp.body}');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception('Search error: $errorMessage');
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
@@ -62,7 +66,8 @@ class ApiClient {
     });
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
-      throw Exception('Nearby places error: ${resp.statusCode} ${resp.body}');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception('Nearby places error: $errorMessage');
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     return List<Map<String, dynamic>>.from(data['places'] ?? []);
@@ -74,14 +79,15 @@ class ApiClient {
     final resp = await http.post(uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password, 'name': name}));
-    final body = resp.body.isEmpty ? '{}' : resp.body;
-    final data = jsonDecode(body) as Map<String, dynamic>;
     if (resp.statusCode == 409) {
       throw Exception('User already exists');
     }
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception(data['detail'] ?? 'Registration failed');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception(errorMessage);
     }
+    final body = resp.body.isEmpty ? '{}' : resp.body;
+    final data = jsonDecode(body) as Map<String, dynamic>;
     return data;
   }
 
@@ -90,11 +96,12 @@ class ApiClient {
     final resp = await http.post(uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'otp': otp}));
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception(errorMessage);
+    }
     final body = resp.body.isEmpty ? '{}' : resp.body;
     final data = jsonDecode(body) as Map<String, dynamic>;
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception(data['detail'] ?? 'Verification failed');
-    }
     return data;
   }
 
@@ -103,14 +110,15 @@ class ApiClient {
     final resp = await http.post(uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}));
-    final body = resp.body.isEmpty ? '{}' : resp.body;
-    final data = jsonDecode(body) as Map<String, dynamic>;
     if (resp.statusCode == 403) {
       throw Exception('Email not verified');
     }
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception(data['detail'] ?? 'Invalid credentials');
+      final errorMessage = ErrorHandler.handleApiResponse(resp.body, resp.statusCode);
+      throw Exception(errorMessage);
     }
+    final body = resp.body.isEmpty ? '{}' : resp.body;
+    final data = jsonDecode(body) as Map<String, dynamic>;
     return data;
   }
 }

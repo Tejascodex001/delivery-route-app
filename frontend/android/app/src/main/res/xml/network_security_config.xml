@@ -5,17 +5,24 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">delivery-w97o.onrender.com</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <!-- Common home network ranges -->
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">192.168.1.0</domain>
-        <domain includeSubdomains="true">192.168.4.0</domain>
-        <!-- Corporate network ranges -->
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-    </domain-config>
+           <domain-config cleartextTrafficPermitted="true">
+               <domain includeSubdomains="true">delivery-w97o.onrender.com</domain>
+               <domain includeSubdomains="true">10.0.2.2</domain>
+               <domain includeSubdomains="true">localhost</domain>
+               <domain includeSubdomains="true">127.0.0.1</domain>
+               <!-- ngrok domains -->
+               <domain includeSubdomains="true">ngrok.io</domain>
+               <domain includeSubdomains="true">ngrok-free.app</domain>
+               <!-- Common home network ranges -->
+               <domain includeSubdomains="true">192.168.0.0</domain>
+               <domain includeSubdomains="true">192.168.1.0</domain>
+               <domain includeSubdomains="true">192.168.4.0</domain>
+               <!-- Mobile hotspot ranges -->
+               <domain includeSubdomains="true">192.168.43.0</domain>
+               <domain includeSubdomains="true">192.168.137.0</domain>
+               <domain includeSubdomains="true">172.20.10.0</domain>
+               <!-- Corporate network ranges -->
+               <domain includeSubdomains="true">10.0.0.0</domain>
+               <domain includeSubdomains="true">172.16.0.0</domain>
+           </domain-config>
 </network-security-config>

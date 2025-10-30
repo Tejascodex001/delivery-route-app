@@ -18,6 +18,7 @@ import 'services/sensor_service.dart';
 import 'services/training_data_service.dart';
 import 'backend_config_screen.dart';
 import 'config.dart';
+import 'utils/error_handler.dart';
 
 class MapScreen extends StatefulWidget {
   final void Function()? onOpenSavedRoutes;
@@ -573,6 +574,10 @@ class _MapScreenState extends State<MapScreen> {
     } catch (e) {
       print('Nearby places error: $e');
       setState(() => _nearbyPlaces = []);
+      // Show user-friendly error message
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, 'Failed to load nearby places: ${e.toString().replaceFirst('Exception: ', '')}');
+      }
     }
   }
 
@@ -591,6 +596,10 @@ class _MapScreenState extends State<MapScreen> {
       } catch (e) {
         print('Search error: $e');
         setState(() => _suggestions = []);
+        // Show user-friendly error message
+        if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, 'Search failed: ${e.toString().replaceFirst('Exception: ', '')}');
+        }
       }
     });
   }
@@ -1497,42 +1506,26 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     if (_ordered.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: _openExternalNav,
-                                icon: const Icon(Icons.navigation, size: 18),
-                                label: const Text('Start Navigation'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  // Clear current route but keep addresses for adding more
-                                  setState(() {
-                                    _ordered = [];
-                                    _polyline = [];
-                                    _orderedAddresses = [];
-                                    _predictedEtaMinutes = null;
-                                  });
-                                  _currentRouteId = null;
-                                  _routeStartTime = null;
-                                },
-                                icon: const Icon(Icons.add_location, size: 18),
-                                label: const Text('Add More'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                          ],
+                        // Removed stretched navigation button - using only the floating action button
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            // Clear current route but keep addresses for adding more
+                            setState(() {
+                              _ordered = [];
+                              _polyline = [];
+                              _orderedAddresses = [];
+                              _predictedEtaMinutes = null;
+                            });
+                            _currentRouteId = null;
+                            _routeStartTime = null;
+                          },
+                          icon: const Icon(Icons.add_location, size: 18),
+                          label: const Text('Add More Stops'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize: const Size(double.infinity, 44),
+                          ),
                         ),
                         const SizedBox(height: 8),
                         // Quick navigation info
@@ -1692,107 +1685,94 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           
           const SizedBox(height: 16),
           
-          // Data Collection Section
+          // Terms and Policy
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Data Collection & Privacy',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Help us improve route optimization by sharing anonymous usage data',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  SwitchListTile(
-                    title: const Text('Enable Data Collection'),
-                    subtitle: const Text('Share anonymous route data for ML training'),
-                    value: _dataCollectionEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _dataCollectionEnabled = value;
-                      });
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Location Tracking'),
-                    subtitle: const Text('Track location for route optimization'),
-                    value: _locationTrackingEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _locationTrackingEnabled = value;
-                      });
-                    },
-                  ),
-                  
-                  SwitchListTile(
-                    title: const Text('Sensor Data'),
-                    subtitle: const Text('Collect accelerometer and gyroscope data'),
-                    value: _sensorDataEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _sensorDataEnabled = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Data Collection Terms
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Why We Collect Data',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '• Route Optimization: Your delivery routes help us improve algorithms\n'
-                    '• Traffic Patterns: Location data helps predict real-time traffic\n'
-                    '• Performance: Sensor data helps optimize battery usage\n'
-                    '• Anonymization: All data is anonymized and cannot identify you\n'
-                    '• Purpose: Improve delivery efficiency for all users',
-                    style: TextStyle(height: 1.5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.policy,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Terms and Policy',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  
+                  ListTile(
+                    leading: const Icon(Icons.description),
+                    title: const Text('Terms of Service'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showTermsOfService(),
+                  ),
+                  
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip),
+                    title: const Text('Privacy Policy'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showPrivacyPolicy(),
+                  ),
+                  
+                  const Divider(),
+                  
+                  // Data Collection Preferences
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Data Usage Terms',
+                          'Data Collection Preferences',
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'By enabling data collection, you agree that:\n'
-                          '• Data is used solely for route optimization\n'
-                          '• No personal information is collected\n'
-                          '• Data may be used for research purposes\n'
-                          '• You can disable collection at any time',
-                          style: TextStyle(height: 1.4),
+                        Text(
+                          'Help us improve route optimization by sharing anonymous usage data',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        SwitchListTile(
+                          title: const Text('Enable Data Collection'),
+                          subtitle: const Text('Share anonymous route data for ML training'),
+                          value: _dataCollectionEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _dataCollectionEnabled = value;
+                            });
+                          },
+                        ),
+                        
+                        SwitchListTile(
+                          title: const Text('Location Tracking'),
+                          subtitle: const Text('Track location for route optimization'),
+                          value: _locationTrackingEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _locationTrackingEnabled = value;
+                            });
+                          },
+                        ),
+                        
+                        SwitchListTile(
+                          title: const Text('Sensor Data'),
+                          subtitle: const Text('Collect accelerometer and gyroscope data'),
+                          value: _sensorDataEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _sensorDataEnabled = value;
+                            });
+                          },
                         ),
                       ],
                     ),
@@ -1859,6 +1839,118 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               }
             },
             child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTermsOfService() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Terms of Service'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Last Updated: October 2025\n\n'
+                '1. Acceptance of Terms\n'
+                'By using ZipRoute, you agree to these Terms of Service. If you do not agree, please do not use the app.\n\n'
+                '2. Use of Service\n'
+                '• ZipRoute is provided for route optimization and delivery management\n'
+                '• You must be at least 18 years old to use this service\n'
+                '• You are responsible for maintaining account security\n\n'
+                '3. User Responsibilities\n'
+                '• Provide accurate information\n'
+                '• Use the service lawfully and ethically\n'
+                '• Do not misuse or attempt to hack the service\n\n'
+                '4. Intellectual Property\n'
+                '• All content and features are owned by ZipRoute\n'
+                '• You may not copy, modify, or distribute our content\n\n'
+                '5. Limitation of Liability\n'
+                '• ZipRoute is provided "as is" without warranties\n'
+                '• We are not liable for any damages from use of the service\n'
+                '• Route suggestions are estimates and may not be optimal\n\n'
+                '6. Termination\n'
+                '• We may terminate or suspend access at any time\n'
+                '• You may delete your account at any time\n\n'
+                '7. Changes to Terms\n'
+                '• We may update these terms at any time\n'
+                '• Continued use constitutes acceptance of new terms',
+                style: TextStyle(fontSize: 13, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyPolicy() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Privacy Policy'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Last Updated: October 2025\n\n'
+                '1. Information We Collect\n'
+                '• Account Information: Email and password (encrypted)\n'
+                '• Location Data: GPS coordinates for route optimization (only when enabled)\n'
+                '• Sensor Data: Accelerometer and gyroscope (only when enabled)\n'
+                '• Route Data: Delivery addresses and route history\n\n'
+                '2. How We Use Your Information\n'
+                '• Route Optimization: Improve delivery route algorithms\n'
+                '• Traffic Prediction: Analyze patterns for better ETA predictions\n'
+                '• Service Improvement: Enhance app performance and features\n'
+                '• ML Training: Train machine learning models (anonymized data only)\n\n'
+                '3. Data Sharing\n'
+                '• We DO NOT sell your personal information\n'
+                '• We DO NOT share data with third parties for marketing\n'
+                '• Anonymized data may be used for research purposes\n'
+                '• We may share data if required by law\n\n'
+                '4. Data Security\n'
+                '• Passwords are encrypted using industry standards\n'
+                '• Data transmission uses HTTPS encryption\n'
+                '• We implement security measures to protect your data\n\n'
+                '5. Data Retention\n'
+                '• Account data is kept until you delete your account\n'
+                '• Route history is kept for 90 days by default\n'
+                '• You can delete all data anytime from settings\n\n'
+                '6. Your Rights\n'
+                '• Access your data anytime\n'
+                '• Delete your data anytime\n'
+                '• Disable data collection anytime\n'
+                '• Export your data (coming soon)\n\n'
+                '7. Children\'s Privacy\n'
+                '• ZipRoute is not intended for users under 18\n'
+                '• We do not knowingly collect data from children\n\n'
+                '8. Changes to Privacy Policy\n'
+                '• We may update this policy at any time\n'
+                '• You will be notified of significant changes\n\n'
+                'For questions, contact: support@ziproute.com',
+                style: TextStyle(fontSize: 13, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
           ),
         ],
       ),

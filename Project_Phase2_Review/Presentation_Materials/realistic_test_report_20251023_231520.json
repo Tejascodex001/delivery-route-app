@@ -1,0 +1,167 @@
+{
+  "test_summary": {
+    "total_tests": 21,
+    "passed_tests": 17,
+    "failed_tests": 4,
+    "error_tests": 0,
+    "success_rate": 80.95,
+    "avg_response_time": 0.231,
+    "min_response_time": 0.001,
+    "max_response_time": 4.768,
+    "test_duration": "0:00:04.840875"
+  },
+  "detailed_results": [
+    {
+      "name": "Health Check",
+      "status": "PASS",
+      "response_time": 0.006209373474121094,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "User Registration",
+      "status": "PASS",
+      "response_time": 4.768371820449829,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "User Login",
+      "status": "FAIL",
+      "response_time": 0.00407719612121582,
+      "status_code": 401,
+      "error": "Status 401"
+    },
+    {
+      "name": "Geocoding",
+      "status": "FAIL",
+      "response_time": 0.004862785339355469,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "Route Optimization",
+      "status": "FAIL",
+      "response_time": 0.0033617019653320312,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "ETA Prediction",
+      "status": "FAIL",
+      "response_time": 0.0012402534484863281,
+      "status_code": 404,
+      "error": "Status 404"
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0060842037200927734,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.002355337142944336,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.003450155258178711,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.004109859466552734,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0016741752624511719,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.003907918930053711,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0076160430908203125,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0052530765533447266,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0051250457763671875,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0039713382720947266,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0059070587158203125,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.0052051544189453125,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.004407644271850586,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.003677845001220703,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Health Check",
+      "status": "PASS",
+      "response_time": 0.006655216217041016,
+      "status_code": 200,
+      "error": ""
+    }
+  ],
+  "recommendations": [
+    "\ud83d\udd34 Critical: Success rate below 90%. System needs attention.",
+    "\ud83d\udfe2 Excellent: Response times are optimal.",
+    "\u26a0\ufe0f System needs optimization before deployment."
+  ]
+}

@@ -5,6 +5,8 @@ import '../api_client.dart';
 import 'package:email_validator/email_validator.dart';
 import '../services/location_service.dart';
 import '../main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/error_handler.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -67,12 +69,67 @@ class _SignInPageState extends State<SignInPage> {
       );
     } on Exception catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
-      // Always show a generic error; do not auto-route to verification on login
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg.isEmpty ? 'Login failed' : msg)),
-      );
+      // Show user-friendly error message
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, msg.isEmpty ? 'Login failed' : msg);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _guestLogin() async {
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      // Store guest session in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isGuest', true);
+      await prefs.setString('userEmail', 'guest@ziproute.com');
+      await prefs.setString('userName', 'Guest User');
+      
+      // Check location permission for guest
+      final locationEnabled = await LocationService.isLocationEnabled();
+      var permission = await LocationService.checkPermission();
+
+      if (!mounted) return;
+
+      if (!locationEnabled || permission == LocationPermission.denied) {
+        final wantsEnable = await _showLocationDialog();
+        if (wantsEnable != true) return; // user cancelled
+        permission = await LocationService.requestPermission();
+        if (!mounted) return;
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission is required to proceed.')),
+          );
+          return;
+        }
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signed in as Guest'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, 'Guest login failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -180,6 +237,15 @@ class _SignInPageState extends State<SignInPage> {
                             )
                           : const Icon(Icons.login),
                       label: const Text('Sign In'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _guestLogin,
+                      icon: const Icon(Icons.person_outline),
+                      label: const Text('Continue as Guest'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Center(

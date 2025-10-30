@@ -1,0 +1,303 @@
+{
+  "test_summary": {
+    "total_tests": 39,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "error_tests": 39,
+    "success_rate": 0.0,
+    "avg_response_time": 0.001,
+    "min_response_time": 0.0,
+    "max_response_time": 0.002,
+    "test_duration": "0:00:00.018461",
+    "health_check_success_rate": 0.0
+  },
+  "detailed_results": [
+    {
+      "name": "Health Check",
+      "status": "ERROR",
+      "response_time": 0.0012364387512207031,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "API Documentation",
+      "status": "ERROR",
+      "response_time": 0.0006337165832519531,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "OpenAPI Schema",
+      "status": "ERROR",
+      "response_time": 0.0004048347473144531,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Root Endpoint",
+      "status": "ERROR",
+      "response_time": 0.0003554821014404297,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "User Registration",
+      "status": "ERROR",
+      "response_time": 0.00039124488830566406,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "OCR Extract Text",
+      "status": "ERROR",
+      "response_time": 0.00035119056701660156,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "OCR Diagnose",
+      "status": "ERROR",
+      "response_time": 0.0003516674041748047,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "OCR Minimal Test",
+      "status": "ERROR",
+      "response_time": 0.0006198883056640625,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "ETA Prediction",
+      "status": "ERROR",
+      "response_time": 0.00035834312438964844,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Plan Full Route",
+      "status": "ERROR",
+      "response_time": 0.00038051605224609375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Nearby Places",
+      "status": "ERROR",
+      "response_time": 0.00034546852111816406,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Search Suggestions",
+      "status": "ERROR",
+      "response_time": 0.0003616809844970703,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Training Data Stats",
+      "status": "ERROR",
+      "response_time": 0.0003151893615722656,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Traffic Config",
+      "status": "ERROR",
+      "response_time": 0.0003247261047363281,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 1",
+      "status": "ERROR",
+      "response_time": 0.0003383159637451172,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 2",
+      "status": "ERROR",
+      "response_time": 0.0003147125244140625,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 3",
+      "status": "ERROR",
+      "response_time": 0.00030112266540527344,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 4",
+      "status": "ERROR",
+      "response_time": 0.00029158592224121094,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 5",
+      "status": "ERROR",
+      "response_time": 0.0002956390380859375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 6",
+      "status": "ERROR",
+      "response_time": 0.0002846717834472656,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 7",
+      "status": "ERROR",
+      "response_time": 0.0002911090850830078,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 8",
+      "status": "ERROR",
+      "response_time": 0.0003249645233154297,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 9",
+      "status": "ERROR",
+      "response_time": 0.0006506443023681641,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Performance Test 10",
+      "status": "ERROR",
+      "response_time": 0.0003509521484375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "ERROR",
+      "response_time": 0.0009889602661132812,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "ERROR",
+      "response_time": 0.0019130706787109375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "ERROR",
+      "response_time": 0.0016078948974609375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "ERROR",
+      "response_time": 0.001232147216796875,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "ERROR",
+      "response_time": 0.0014858245849609375,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "ERROR",
+      "response_time": 0.0013854503631591797,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "ERROR",
+      "response_time": 0.0015816688537597656,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "ERROR",
+      "response_time": 0.0008401870727539062,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "ERROR",
+      "response_time": 0.0007665157318115234,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "ERROR",
+      "response_time": 0.0016605854034423828,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "ERROR",
+      "response_time": 0.0010962486267089844,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "ERROR",
+      "response_time": 0.0006749629974365234,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "ERROR",
+      "response_time": 0.0013053417205810547,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "ERROR",
+      "response_time": 0.0017595291137695312,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "ERROR",
+      "response_time": 0.0006597042083740234,
+      "status_code": 0,
+      "error": "Connection refused - Backend not running"
+    }
+  ],
+  "performance_analysis": {
+    "p50": 0.0004048347473144531,
+    "p95": 0.0017595291137695312,
+    "p99": 0.0019130706787109375,
+    "std_deviation": 0.0005136550714803663,
+    "fastest_response": 0.0002846717834472656,
+    "slowest_response": 0.0019130706787109375
+  },
+  "recommendations": [
+    "\ud83d\udd34 Critical: Success rate below 80%. System needs immediate attention.",
+    "\ud83d\udd34 Critical: Core system health issues detected. Backend needs immediate attention.",
+    "\ud83d\udfe2 Excellent: Response times are optimal. System is very fast.",
+    "\u26a0\ufe0f System needs optimization before deployment. Address identified issues."
+  ]
+}

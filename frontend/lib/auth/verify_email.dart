@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api_client.dart';
+import '../utils/error_handler.dart';
 
 class VerifyEmailPage extends StatefulWidget {
   const VerifyEmailPage({super.key});
@@ -39,10 +40,12 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     try {
       await _api.verifyEmail(email: _email!, otp: _codeController.text.trim());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email verified successfully! Please sign in.')),
-      );
+      ErrorHandler.showSuccessSnackBar(context, 'Email verified successfully! Please sign in.');
       Navigator.pushReplacementNamed(context, '/signin');
+    } on Exception catch (e) {
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 // import '../services/email_service.dart';
 import '../api_client.dart';
 import 'package:email_validator/email_validator.dart';
+import '../utils/error_handler.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -70,9 +71,9 @@ class _SignUpPageState extends State<SignUpPage> {
         );
       }
     } on Exception catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (mounted) {
+        ErrorHandler.showErrorSnackBar(context, e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

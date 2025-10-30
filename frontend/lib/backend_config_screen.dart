@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
+import 'utils/keyboard_handler.dart';
 
 class BackendConfigScreen extends StatefulWidget {
   const BackendConfigScreen({super.key});
@@ -16,12 +17,14 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
   bool _isConnected = false;
   String _connectionStatus = '';
   Map<String, dynamic> _networkInfo = {};
+  List<String> _savedUrls = [];
 
   @override
   void initState() {
     super.initState();
     _loadCurrentConfig();
     _loadNetworkInfo();
+    _loadSavedUrls();
   }
 
   void _loadCurrentConfig() {
@@ -32,6 +35,37 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
     final info = await ApiConfig.getNetworkInfo();
     setState(() {
       _networkInfo = info;
+    });
+  }
+
+  Future<void> _loadSavedUrls() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrls = prefs.getStringList('saved_backend_urls') ?? [];
+    setState(() {
+      _savedUrls = savedUrls;
+    });
+  }
+
+  Future<void> _saveUrlToList() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty || _savedUrls.contains(url)) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final updatedUrls = [..._savedUrls, url];
+    await prefs.setStringList('saved_backend_urls', updatedUrls);
+    
+    setState(() {
+      _savedUrls = updatedUrls;
+    });
+  }
+
+  Future<void> _removeUrlFromList(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    final updatedUrls = _savedUrls.where((u) => u != url).toList();
+    await prefs.setStringList('saved_backend_urls', updatedUrls);
+    
+    setState(() {
+      _savedUrls = updatedUrls;
     });
   }
 
@@ -80,23 +114,30 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
     }
   }
 
-  void _saveConfig() {
+  void _saveConfig() async {
     if (_isConnected) {
-      ApiConfig.setBackendUrl(_urlController.text.trim());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Backend URL saved successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context);
+      final url = _urlController.text.trim();
+      ApiConfig.setBackendUrl(url);
+      await _saveUrlToList(); // Save to favorites
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Backend URL saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please test connection first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please test connection first'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -117,6 +158,15 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
     });
   }
 
+  String _getUrlType(String url) {
+    if (url.contains('ngrok.io')) return 'ngrok Tunnel';
+    if (url.contains('onrender.com')) return 'Production (Render)';
+    if (url.contains('192.168.')) return 'Local Network';
+    if (url.contains('10.0.2.2')) return 'Android Emulator';
+    if (url.contains('localhost') || url.contains('127.0.0.1')) return 'Local Development';
+    return 'Custom URL';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -125,8 +175,9 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Padding(
+      body: KeyboardAwareWidget(
         padding: const EdgeInsets.all(16.0),
+        bottomSpacing: 150, // Extra space for keyboard
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -159,13 +210,14 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            TextField(
+            KeyboardAwareTextField(
               controller: _urlController,
-              decoration: const InputDecoration(
-                hintText: 'http://192.168.1.100:8000',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.link),
-              ),
+              hintText: 'Enter your backend URL',
+              helperText: 'Enter your backend URL (local IP or production)',
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              onSubmitted: _testConnection,
+              prefixIcon: const Icon(Icons.link),
             ),
             
             const SizedBox(height: 16),
@@ -249,6 +301,41 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
             
             const SizedBox(height: 16),
             
+            // Saved URLs
+            if (_savedUrls.isNotEmpty) ...[
+              Text(
+                'Saved URLs',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              ...(_savedUrls.map((url) => Card(
+                child: ListTile(
+                  title: Text(url),
+                  subtitle: Text(_getUrlType(url)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () {
+                          _urlController.text = url;
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () => _removeUrlFromList(url),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    _urlController.text = url;
+                    _testConnection();
+                  },
+                ),
+              ))),
+              const SizedBox(height: 16),
+            ],
+            
             // Quick URLs
             Text(
               'Quick URLs',
@@ -259,12 +346,6 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                ActionChip(
-                  label: const Text('Production'),
-                  onPressed: () {
-                    _urlController.text = ApiConfig.prodBaseUrl;
-                  },
-                ),
                 ActionChip(
                   label: const Text('Local 101'),
                   onPressed: () {
@@ -285,6 +366,7 @@ class _BackendConfigScreenState extends State<BackendConfigScreen> {
                 ),
               ],
             ),
+            
           ],
         ),
       ),

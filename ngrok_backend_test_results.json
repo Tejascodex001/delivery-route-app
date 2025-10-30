@@ -1,0 +1,146 @@
+{
+  "test_suite": "ngrok_backend_comprehensive_test",
+  "backend_url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev",
+  "timestamp": "2025-10-24T12:10:36Z",
+  "tests": [
+    {
+      "name": "Root",
+      "method": "GET",
+      "endpoint": "/",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/",
+      "status_code": 200,
+      "response_time": .178055250,
+      "success": true,
+      "response_size": 80,
+      "timestamp": "2025-10-24T12:10:36Z",
+      "response_preview": "{\"message\":\"Welcome to the AI Route Optimization API! It is running correctly.\"}"
+    }
+,
+    {
+      "name": "Health Check",
+      "method": "GET",
+      "endpoint": "/health",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/health",
+      "status_code": 200,
+      "response_time": .145197548,
+      "success": true,
+      "response_size": 68,
+      "timestamp": "2025-10-24T12:10:36Z",
+      "response_preview": "{\"status\":\"healthy\",\"ocr_model_loaded\":true,\"ml_models_loaded\":true}"
+    }
+,
+    {
+      "name": "API Documentation",
+      "method": "GET",
+      "endpoint": "/docs",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/docs",
+      "status_code": 200,
+      "response_time": .138738777,
+      "success": true,
+      "response_size": 946,
+      "timestamp": "2025-10-24T12:10:36Z",
+      "response_preview": "
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">
+    <link rel=\"shortcut icon\" href=\"https://"
+    }
+,
+    {
+      "name": "OpenAPI Schema",
+      "method": "GET",
+      "endpoint": "/openapi.json",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/openapi.json",
+      "status_code": 200,
+      "response_time": .237276725,
+      "success": true,
+      "response_size": 15048,
+      "timestamp": "2025-10-24T12:10:37Z",
+      "response_preview": "{\"openapi\":\"3.1.0\",\"info\":{\"title\":\"Delivery Logistics API\",\"version\":\"0.1.0\"},\"paths\":{\"/\":{\"get\":{\"summary\":\"Read Root\",\"operationId\":\"read_root__get\",\"responses\":{\"200\":{\"description\":\"Successful R"
+    }
+,
+    {
+      "name": "User Registration",
+      "method": "POST",
+      "endpoint": "/auth/register",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/auth/register",
+      "status_code": 200,
+      "response_time": 4.341368237,
+      "success": true,
+      "response_size": 44,
+      "timestamp": "2025-10-24T12:10:41Z",
+      "response_preview": "{\"message\":\"Verification OTP sent to email\"}"
+    }
+,
+    {
+      "name": "Search Suggestions",
+      "method": "GET",
+      "endpoint": "/search-suggestions",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/search-suggestions?q=mumbai",
+      "status_code": 200,
+      "response_time": 1.119634496,
+      "success": true,
+      "response_size": 229,
+      "timestamp": "2025-10-24T12:10:42Z",
+      "response_preview": "{\"suggestions\":[{\"display_name\":\"Mumbai, MH, India\",\"lat\":19.131577,\"lon\":72.891418},{\"display_name\":\"Mumbai, MH, India\",\"lat\":18.957375,\"lon\":72.855871},{\"display_name\":\"Mumbai City, MH, India\",\"lat\""
+    }
+,
+    {
+      "name": "Nearby Places",
+      "method": "GET",
+      "endpoint": "/nearby-places",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/nearby-places?lat=19.0760&lon=72.8777&radius=1000",
+      "status_code": 200,
+      "response_time": 1.200768116,
+      "success": true,
+      "response_size": 1259,
+      "timestamp": "2025-10-24T12:10:43Z",
+      "response_preview": "{\"places\":[{\"name\":\"Petrol Pump\",\"amenity\":\"fuel\",\"lat\":19.0763832,\"lon\":72.8773575,\"display_name\":\"Petrol Pump (Fuel)\"},{\"name\":\"CNG\",\"amenity\":\"fuel\",\"lat\":19.0765873,\"lon\":72.8772337,\"display_name\""
+    }
+,
+    {
+      "name": "Route Optimization",
+      "method": "POST",
+      "endpoint": "/plan-full-route",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/plan-full-route",
+      "status_code": 200,
+      "response_time": 26.570903060,
+      "success": true,
+      "response_size": 481409,
+      "timestamp": "2025-10-24T12:11:10Z",
+      "response_preview": "{\"ordered_addresses\":[\"Mumbai, India\",\"Delhi, India\",\"Bangalore, India\"],\"ordered_coordinates\":[[19.054999,72.8692035],[28.6328027,77.2197713],[12.9767936,77.590082]],\"ors_duration_minutes\":6017.2,\"to"
+    }
+,
+    {
+      "name": "ETA Prediction",
+      "method": "POST",
+      "endpoint": "/predict-eta",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/predict-eta",
+      "status_code": 200,
+      "response_time": .139018283,
+      "success": true,
+      "response_size": 31,
+      "timestamp": "2025-10-24T12:11:10Z",
+      "response_preview": "{\"predicted_eta_minutes\":81.45}"
+    }
+,
+    {
+      "name": "OCR Text Extraction",
+      "method": "POST",
+      "endpoint": "/ocr/extract-text",
+      "url": "https://unseasonable-emely-unvoluminous.ngrok-free.dev/ocr/extract-text",
+      "status_code": 422,
+      "response_time": .161436868,
+      "success": false,
+      "response_size": 90,
+      "timestamp": "2025-10-24T12:11:10Z",
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"image\"],\"msg\":\"Field required\",\"input\":null}]}"
+    }
+  ],
+  "summary": {
+    "total_tests": 10,
+    "timestamp": "2025-10-24T12:11:10Z",
+    "test_duration": "2025-10-24T12:11:10Z"
+  }
+}

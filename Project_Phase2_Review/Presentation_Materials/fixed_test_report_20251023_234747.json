@@ -1,0 +1,303 @@
+{
+  "test_summary": {
+    "total_tests": 39,
+    "passed_tests": 36,
+    "failed_tests": 3,
+    "error_tests": 0,
+    "success_rate": 92.31,
+    "avg_response_time": 0.389,
+    "min_response_time": 0.001,
+    "max_response_time": 6.115,
+    "test_duration": "0:00:15.126299",
+    "health_check_success_rate": 100.0
+  },
+  "detailed_results": [
+    {
+      "name": "Health Check",
+      "status": "PASS",
+      "response_time": 0.004651069641113281,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "API Documentation",
+      "status": "PASS",
+      "response_time": 0.003720521926879883,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "OpenAPI Schema",
+      "status": "PASS",
+      "response_time": 0.0016169548034667969,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Root Endpoint",
+      "status": "PASS",
+      "response_time": 0.0013506412506103516,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "User Registration",
+      "status": "PASS",
+      "response_time": 3.8779187202453613,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "OCR Extract Text",
+      "status": "FAIL",
+      "response_time": 0.0017833709716796875,
+      "status_code": 422,
+      "error": "Status 422"
+    },
+    {
+      "name": "OCR Diagnose",
+      "status": "FAIL",
+      "response_time": 0.0017693042755126953,
+      "status_code": 422,
+      "error": "Status 422"
+    },
+    {
+      "name": "OCR Minimal Test",
+      "status": "FAIL",
+      "response_time": 0.002231121063232422,
+      "status_code": 422,
+      "error": "Status 422"
+    },
+    {
+      "name": "ETA Prediction",
+      "status": "PASS",
+      "response_time": 0.013934612274169922,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Plan Full Route",
+      "status": "PASS",
+      "response_time": 6.114527702331543,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Nearby Places",
+      "status": "PASS",
+      "response_time": 4.144343137741089,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Search Suggestions",
+      "status": "PASS",
+      "response_time": 0.9228026866912842,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Training Data Stats",
+      "status": "PASS",
+      "response_time": 0.0022635459899902344,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Traffic Config",
+      "status": "PASS",
+      "response_time": 0.0014600753784179688,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 1",
+      "status": "PASS",
+      "response_time": 0.0010876655578613281,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 2",
+      "status": "PASS",
+      "response_time": 0.0011050701141357422,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 3",
+      "status": "PASS",
+      "response_time": 0.0010731220245361328,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 4",
+      "status": "PASS",
+      "response_time": 0.0008511543273925781,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 5",
+      "status": "PASS",
+      "response_time": 0.0008280277252197266,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 6",
+      "status": "PASS",
+      "response_time": 0.0008282661437988281,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 7",
+      "status": "PASS",
+      "response_time": 0.0008370876312255859,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 8",
+      "status": "PASS",
+      "response_time": 0.0009143352508544922,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 9",
+      "status": "PASS",
+      "response_time": 0.0010154247283935547,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Performance Test 10",
+      "status": "PASS",
+      "response_time": 0.0009036064147949219,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.00582122802734375,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.0030744075775146484,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.0020961761474609375,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.0020809173583984375,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.003206491470336914,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.005861043930053711,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.003484964370727539,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.002529144287109375,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.002768278121948242,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.0032167434692382812,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 1",
+      "status": "PASS",
+      "response_time": 0.005975961685180664,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 2",
+      "status": "PASS",
+      "response_time": 0.0029535293579101562,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 3",
+      "status": "PASS",
+      "response_time": 0.0020194053649902344,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 4",
+      "status": "PASS",
+      "response_time": 0.003563404083251953,
+      "status_code": 200,
+      "error": ""
+    },
+    {
+      "name": "Concurrent Test 5",
+      "status": "PASS",
+      "response_time": 0.0023241043090820312,
+      "status_code": 200,
+      "error": ""
+    }
+  ],
+  "performance_analysis": {
+    "p50": 0.0022635459899902344,
+    "p95": 4.144343137741089,
+    "p99": 6.114527702331543,
+    "std_deviation": 1.3034810911182821,
+    "fastest_response": 0.0008280277252197266,
+    "slowest_response": 6.114527702331543
+  },
+  "recommendations": [
+    "\ud83d\udfe1 Good: Overall success rate above 90%. System is performing well with minor issues.",
+    "\ud83d\udfe2 Excellent: Core system health is excellent. Backend is stable and reliable.",
+    "\ud83d\udfe2 Excellent: Response times are optimal. System is very fast.",
+    "\ud83d\ude80 System is production-ready with excellent performance across all metrics."
+  ]
+}

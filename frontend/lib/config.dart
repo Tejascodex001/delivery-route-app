@@ -3,7 +3,15 @@ import 'package:http/http.dart' as http;
 
 class ApiConfig {
   // Production backend (Render)
-  static const String prodBaseUrl = 'https://delivery-w97o.onrender.com';
+  static const String prodBaseUrl = '';
+  
+  // ngrok URLs (add your ngrok URL here)
+  static const List<String> ngrokUrls = [
+    'https://unseasonable-emely-unvoluminous.ngrok-free.dev',  // Your current ngrok URL
+    'https://ziproute-backend.ngrok.io',  // Your custom ngrok domain
+    'https://abc123.ngrok.io',            // Replace with your actual ngrok URL
+    // Add more ngrok URLs as needed
+  ];
   
   // Common local development URLs to try
   static const List<String> localUrls = [
@@ -12,6 +20,11 @@ class ApiConfig {
     'http://10.0.2.2:8000',       // Android emulator
     'http://localhost:8000',       // Local development
     'http://127.0.0.1:8000',      // Local development
+    // Mobile hotspot common IPs
+    'http://192.168.43.1:8000',   // Android hotspot default
+    'http://192.168.137.1:8000',  // Windows mobile hotspot
+    'http://10.0.0.1:8000',       // Some mobile hotspots
+    'http://172.20.10.1:8000',    // iOS hotspot default
   ];
   
   // Network ranges to scan
@@ -19,6 +32,9 @@ class ApiConfig {
     '192.168.0',   // Common home network
     '192.168.1',   // Common home network
     '192.168.4',   // Mobile hotspot
+    '192.168.43',  // Android hotspot
+    '192.168.137', // Windows mobile hotspot
+    '172.20.10',   // iOS hotspot
     '10.0.0',      // Corporate network
     '172.16.0',    // Corporate network
   ];
@@ -46,7 +62,17 @@ class ApiConfig {
   static Future<void> detectBackend() async {
     print('🔍 Detecting backend URL...');
     
-    // First, try production URL
+    // First, try ngrok URLs (for development with public access)
+    for (String url in ngrokUrls) {
+      if (await _testUrl(url)) {
+        _detectedBackendUrl = url;
+        _isProduction = true; // ngrok URLs are considered production-like
+        print('✅ Using ngrok backend: $url');
+        return;
+      }
+    }
+    
+    // Try production URL
     if (await _testUrl(prodBaseUrl)) {
       _detectedBackendUrl = prodBaseUrl;
       _isProduction = true;
