@@ -330,7 +330,7 @@ class PlannedRouteResponse(BaseModel):
 
 # --- Geocoding and ORS Utilities ---
 # Load API keys from environment variables
-ORS_API_KEY: str = os.environ.get("ORS_API_KEY", "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjhmMWIyYWU2YmZjODQ0NjNiYmNlYjg5Yzg1YjI3MjMyIiwiaCI6Im11cm11cjY0In0=")
+ORS_API_KEY: str = os.environ.get("ORS_API_KEY", "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjE0MWRkZGMxZWNlMDFjZWZiNzMwNzNmNjZkZjIxN2JkMWZlZDM5OGI3NDc0YjMwNDc5YmNlMzljIiwiaCI6Im11cm11cjY0In0=")
 
 # Traffic data API keys (optional - for real-time traffic)
 MAPMYINDIA_API_KEY: str = os.environ.get("MAPMYINDIA_API_KEY", "")
@@ -363,13 +363,13 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
         try:
             url = "https://api.openrouteservice.org/geocode/search"
             # Try different header formats for ORS API
-            headers = {"Authorization": f"Bearer {ORS_API_KEY}"}
+            headers = {"Authorization": ORS_API_KEY}
             params = {
                 "text": address,
                 "boundary.country": "IN",  # Focus on India
                 "size": 5,  # Reduce size to avoid potential issues
-                "layers": "address,poi,street",  # Simplified layers
-                "sources": "osm"  # Single source to avoid conflicts
+                # "layers": "address,poi,street",  # Simplified layers
+                "sources": "openstreetmap"  # Single source to avoid conflicts
             }
             logger.info(f"🔍 ORS geocoding request for '{address}' with key: {ORS_API_KEY[:20]}...")
             resp = requests.get(url, params=params, headers=headers, timeout=10)
@@ -439,7 +439,7 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     
     # Fallback to Nominatim with better parameters
     logger.info(f"🔄 Trying Nominatim fallback for '{address}'")
-    headers = {"User-Agent": "delivery-route-app/1.0 (contact: dev@example.com)"}
+    headers = {"User-Agent": "delivery-route-app/1.0 (contact: tejas12gowda.com)"}
     params = {
         "q": address, 
         "format": "json", 
